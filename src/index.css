@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --color-base-950: #0a0a0b;
+  --color-base-900: #0f0f11;
+  --color-base-850: #131316;
+  --color-base-800: #18181c;
+  --color-base-700: #202024;
+  --color-base-600: #2a2a30;
+  --color-base-500: #3a3a42;
+  --color-base-400: #6b6b76;
+  --color-base-300: #9a9aa4;
+  --color-base-200: #c4c4cc;
+  --color-base-100: #e8e8ec;
+  --color-base-50: #f7f7f9;
+
+  --color-brand-400: #ff4d5e;
+  --color-brand-500: #e4293b;
+  --color-brand-600: #c81628;
+  --color-brand-700: #a20f1f;
+
+  --color-status-online: #22c55e;
+  --color-status-warning: #eab308;
+  --color-status-offline: #6b6b76;
+  --color-status-danger: #ef4444;
+
+  --animate-pulse-slow: pulse-slow 2.4s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scan: scan 3s linear infinite;
+
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-base-700/60;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-base-950 text-base-100 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    @apply bg-brand-500/30 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-base-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-base-500;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+.leaflet-container {
+  background: #0f0f11;
+  font-family: var(--font-sans);
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #f7f7f9;
+}
+.leaflet-popup-content {
+  margin: 10px 12px;
+}
+.leaflet-control-zoom a {
+  background: #18181c !important;
+  color: #e8e8ec !important;
+  border-color: #202024 !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #202024 !important;
+}
+.leaflet-control-attribution {
+  background: rgba(15, 15, 17, 0.7) !important;
+  color: #6b6b76 !important;
+}
+.leaflet-control-attribution a {
+  color: #9a9aa4 !important;
+}
+.leaflet-tooltip {
+  background: rgba(15, 15, 17, 0.85);
+  border: none;
+  box-shadow: none;
+  color: #e8e8ec;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.leaflet-tooltip-top::before {
+  display: none;
+}
