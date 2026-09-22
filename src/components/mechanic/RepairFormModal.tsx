@@ -1,6 +1,6 @@
 import { CheckCircle2, ClipboardList, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PhotoUploadField } from "@/components/mechanic/PhotoUploadField";
+import { PhotoUploadField } from "@/components/ui/PhotoUploadField";
 import { Modal } from "@/components/ui/Modal";
 import { repairClient } from "@/lib/repairClient";
 import type { RepairExpense, RepairReport, RepairRequest } from "@/types/repair";

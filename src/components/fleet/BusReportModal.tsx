@@ -4,13 +4,13 @@ import { BusBlueprint } from "@/components/fleet/BusBlueprint";
 import { PhotoGalleryModal } from "@/components/fleet/PhotoGalleryModal";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { busReports } from "@/data/buses";
+import { useBusReport } from "@/hooks/useBusReport";
 import type { Bus } from "@/types/bus";
 
 export function BusReportModal({ bus, onClose }: { bus: Bus | null; onClose: () => void }) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const report = bus ? busReports[bus.id] : undefined;
+  const report = useBusReport(bus?.id);
   const fotos = report?.fotos ?? [];
 
   function openGallery() {
