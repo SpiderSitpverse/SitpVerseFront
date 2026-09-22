@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { roleHome } from "@/lib/roles";
 import type { Role } from "@/types/driver";
 
 export function ProtectedRoute({ roles }: { roles?: Role[] }) {
@@ -10,7 +11,7 @@ export function ProtectedRoute({ roles }: { roles?: Role[] }) {
   }
 
   if (roles && role && !roles.includes(role)) {
-    return <Navigate to={role === "conductor" ? "/conductor" : "/"} replace />;
+    return <Navigate to={roleHome(role)} replace />;
   }
 
   return <Outlet />;

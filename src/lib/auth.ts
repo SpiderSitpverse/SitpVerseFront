@@ -27,6 +27,7 @@ const DEFAULT_ACCOUNTS: Account[] = [
   { userId: "admin", password: "transmilenio2026", role: "admin", nombre: "Kevin Cuitiva" },
   { userId: "conductor", password: "conductor2026", role: "conductor", nombre: "Miguel Ángel Rojas" },
   { userId: "conductor2", password: "conductor2026", role: "conductor", nombre: "Laura Gómez" },
+  { userId: "mecanico", password: "taller2026", role: "mecanico", nombre: "Camilo Torres" },
 ];
 
 function getStoredAccounts(): Account[] {

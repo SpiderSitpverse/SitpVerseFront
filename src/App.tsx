@@ -1,4 +1,4 @@
-import { HandHeart, LayoutDashboard } from "lucide-react";
+import { ClipboardList, HandHeart, LayoutDashboard, Wrench } from "lucide-react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -11,6 +11,8 @@ import { HomePage } from "@/pages/HomePage";
 import { IncidentsPage } from "@/pages/IncidentsPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MaintenancePage } from "@/pages/MaintenancePage";
+import { MechanicHistoryPage } from "@/pages/MechanicHistoryPage";
+import { MechanicHomePage } from "@/pages/MechanicHomePage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -18,6 +20,11 @@ import { UsersPage } from "@/pages/UsersPage";
 const DRIVER_NAV_ITEMS: NavItem[] = [
   { to: "/conductor", label: "Inicio", icon: LayoutDashboard, end: true },
   { to: "/conductor/ayuda", label: "Ayuda a compañeros", icon: HandHeart },
+];
+
+const MECHANIC_NAV_ITEMS: NavItem[] = [
+  { to: "/taller", label: "Solicitudes", icon: Wrench, end: true },
+  { to: "/taller/reparaciones", label: "Mis reparaciones", icon: ClipboardList },
 ];
 
 function App() {
@@ -44,6 +51,14 @@ function App() {
           <Route path="conductor" element={<DriverHomePage />} />
           <Route path="conductor/ayuda" element={<DriverHelpPage />} />
           <Route path="conductor/*" element={<Navigate to="/conductor" replace />} />
+        </Route>
+      </Route>
+
+      <Route element={<ProtectedRoute roles={["mecanico"]} />}>
+        <Route element={<AppLayout navItems={MECHANIC_NAV_ITEMS} />}>
+          <Route path="taller" element={<MechanicHomePage />} />
+          <Route path="taller/reparaciones" element={<MechanicHistoryPage />} />
+          <Route path="taller/*" element={<Navigate to="/taller" replace />} />
         </Route>
       </Route>
 

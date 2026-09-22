@@ -7,6 +7,7 @@ import { BrandLockup } from "@/components/brand/SpiderverseLogo";
 import { TextField } from "@/components/ui/TextField";
 import { useAuth } from "@/context/AuthContext";
 import { changePassword } from "@/lib/auth";
+import { roleHome } from "@/lib/roles";
 
 type View = "login" | "change-password";
 
@@ -27,7 +28,7 @@ export function LoginPage() {
   const [changeSuccess, setChangeSuccess] = useState(false);
 
   if (userId) {
-    return <Navigate to={role === "conductor" ? "/conductor" : "/"} replace />;
+    return <Navigate to={roleHome(role)} replace />;
   }
 
   function handleLogin(e: FormEvent) {
@@ -39,7 +40,7 @@ export function LoginPage() {
       setLoginError("Usuario o contraseña incorrectos.");
       return;
     }
-    navigate(loggedInRole === "conductor" ? "/conductor" : "/", { replace: true });
+    navigate(roleHome(loggedInRole), { replace: true });
   }
 
   function handleChangePassword(e: FormEvent) {

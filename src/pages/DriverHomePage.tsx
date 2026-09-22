@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bus as BusIcon, Check, CircleStop, Clock, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PreTripInspectionModal, type PreTripInspection } from "@/components/driver/PreTripInspectionModal";
 import { ReportProblemModal } from "@/components/driver/ReportProblemModal";
 import { TransMilenioMap } from "@/components/fleet/TransMilenioMap";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,12 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { driverAssignments } from "@/data/driverAssignment";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
+import { busReportClient } from "@/lib/busReportClient";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
 
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
   const activeTrips = useActiveTrips();
   const [reportOpen, setReportOpen] = useState(false);
+  const [inspectionOpen, setInspectionOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const assignment = userId ? driverAssignments[userId] : undefined;
@@ -26,8 +29,24 @@ export function DriverHomePage() {
     return () => clearTimeout(id);
   }, [confirmation]);
 
-  function handleStart() {
+  function handleInspectionSubmit(inspection: PreTripInspection) {
     if (!assignment || !userId) return;
+
+    busReportClient.saveReport(assignment.busId, {
+      nombre: nombre ?? userId,
+      rol: "Conductor",
+      fecha: new Date().toLocaleString("es-CO", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      nota: inspection.nota,
+      comentario: inspection.comentario || inspection.nota,
+      fotos: inspection.fotos,
+    });
+
     fleetActivityClient.startTrip({
       busId: assignment.busId,
       placa: assignment.placa,
@@ -36,7 +55,9 @@ export function DriverHomePage() {
       driverName: nombre ?? userId,
       startedAt: new Date().toISOString(),
     });
-    setConfirmation("Ruta iniciada. Ya apareces como bus activo para el administrador.");
+
+    setInspectionOpen(false);
+    setConfirmation("Ruta iniciada. Tu reporte de inspección ya es visible para el administrador.");
   }
 
   function handleFinish() {
@@ -137,7 +158,7 @@ export function DriverHomePage() {
             <div className="space-y-2.5 pt-1">
               {!started ? (
                 <button
-                  onClick={handleStart}
+                  onClick={() => setInspectionOpen(true)}
                   className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
                 >
                   Iniciar ruta
@@ -175,6 +196,13 @@ export function DriverHomePage() {
       </div>
 
       <ReportProblemModal open={reportOpen} onClose={() => setReportOpen(false)} onSubmit={handleReportSubmit} />
+
+      <PreTripInspectionModal
+        open={inspectionOpen}
+        onClose={() => setInspectionOpen(false)}
+        assignment={assignment}
+        onSubmit={handleInspectionSubmit}
+      />
     </div>
   );
 }
