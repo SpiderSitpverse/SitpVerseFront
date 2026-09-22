@@ -1,4 +1,4 @@
-export type Role = "admin" | "conductor";
+export type Role = "admin" | "conductor" | "mecanico";
 
 export interface AssignedRoute {
   driverId: string;
