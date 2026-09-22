@@ -1,33 +1,23 @@
-import {
-  Bus,
-  LayoutDashboard,
-  LogOut,
-  Settings,
-  TriangleAlert,
-  Users,
-  Wrench,
-  BarChart3,
-  X,
-} from "lucide-react";
+import { LogOut, X, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { BrandLockup } from "@/components/brand/SpiderverseLogo";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Inicio", icon: LayoutDashboard, end: true },
-  { to: "/buses", label: "Buses", icon: Bus },
-  { to: "/incidentes", label: "Incidentes", icon: TriangleAlert },
-  { to: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
-  { to: "/reportes", label: "Reportes", icon: BarChart3 },
-  { to: "/usuarios", label: "Usuarios", icon: Users },
-  { to: "/configuracion", label: "Configuración", icon: Settings },
-];
+export interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+}
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
-  const { userId, logout } = useAuth();
+function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
+  const { userId, nombre, logout } = useAuth();
   const navigate = useNavigate();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function handleLogout() {
     logout();
@@ -35,12 +25,13 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     navigate("/login", { replace: true });
   }
 
-  const initials = (userId ?? "?").slice(0, 2).toUpperCase();
+  const displayName = nombre ?? userId ?? "?";
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <>
       <nav className="flex-1 space-y-1 px-3">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -63,31 +54,47 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t border-base-700/60 p-3">
         <button
-          onClick={handleLogout}
+          onClick={() => setConfirmOpen(true)}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-base-800"
         >
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-base-700 text-xs font-semibold text-base-100">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-base-100">{userId}</p>
+            <p className="truncate text-sm font-medium text-base-100">{displayName}</p>
             <p className="truncate text-[11px] text-base-400">Cerrar sesión</p>
           </div>
           <LogOut className="size-4 shrink-0 text-base-400" />
         </button>
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleLogout}
+        title="¿Cerrar sesión?"
+        description="Vas a salir de tu cuenta. Tendrás que volver a iniciar sesión para continuar."
+        confirmLabel="Cerrar sesión"
+        icon={LogOut}
+      />
     </>
   );
 }
 
-export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; onCloseMobile: () => void }) {
+interface SidebarProps {
+  items: NavItem[];
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+}
+
+export function Sidebar({ items, mobileOpen, onCloseMobile }: SidebarProps) {
   return (
     <>
       <aside className="hidden w-64 shrink-0 flex-col border-r border-base-700/60 bg-base-900/40 lg:flex">
         <div className="px-5 py-6">
           <BrandLockup />
         </div>
-        <SidebarNav />
+        <SidebarNav items={items} />
       </aside>
 
       <AnimatePresence>
@@ -117,7 +124,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; on
                   <X className="size-4" />
                 </button>
               </div>
-              <SidebarNav onNavigate={onCloseMobile} />
+              <SidebarNav items={items} onNavigate={onCloseMobile} />
             </motion.aside>
           </>
         )}

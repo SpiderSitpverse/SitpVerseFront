@@ -1,35 +1,54 @@
-const CREDENTIALS_KEY = "sitpverse.credentials";
+import type { Role } from "@/types/driver";
+
+const ACCOUNTS_KEY = "sitpverse.accounts";
 const SESSION_KEY = "sitpverse.session";
 
-export interface Credentials {
+export interface Account {
   userId: string;
   password: string;
+  role: Role;
+  nombre: string;
 }
 
-const DEFAULT_CREDENTIALS: Credentials = {
-  userId: "admin",
-  password: "transmilenio2026",
-};
+export interface Session {
+  userId: string;
+  role: Role;
+  nombre: string;
+}
 
-export function getStoredCredentials(): Credentials {
+/**
+ * Demo accounts. `accounts` (passwords included) live in localStorage since
+ * they represent shared "backend" data — swap getStoredAccounts/saveAccounts
+ * for real API calls later. The active `session`, by contrast, lives in
+ * sessionStorage (one per browser tab) so an admin tab and a driver tab can
+ * be logged in side by side in the same browser to demo the two roles.
+ */
+const DEFAULT_ACCOUNTS: Account[] = [
+  { userId: "admin", password: "transmilenio2026", role: "admin", nombre: "Kevin Cuitiva" },
+  { userId: "conductor", password: "conductor2026", role: "conductor", nombre: "Miguel Ángel Rojas" },
+  { userId: "conductor2", password: "conductor2026", role: "conductor", nombre: "Laura Gómez" },
+];
+
+function getStoredAccounts(): Account[] {
   try {
-    const raw = localStorage.getItem(CREDENTIALS_KEY);
-    if (!raw) return DEFAULT_CREDENTIALS;
-    const parsed = JSON.parse(raw) as Partial<Credentials>;
-    if (!parsed.userId || !parsed.password) return DEFAULT_CREDENTIALS;
-    return { userId: parsed.userId, password: parsed.password };
+    const raw = localStorage.getItem(ACCOUNTS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Account[]) : null;
+    if (!parsed || !Array.isArray(parsed) || parsed.length === 0) return DEFAULT_ACCOUNTS;
+    return parsed;
   } catch {
-    return DEFAULT_CREDENTIALS;
+    return DEFAULT_ACCOUNTS;
   }
 }
 
-function saveCredentials(credentials: Credentials) {
-  localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials));
+function saveAccounts(accounts: Account[]) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
-export function verifyLogin(userId: string, password: string): boolean {
-  const stored = getStoredCredentials();
-  return stored.userId.trim().toLowerCase() === userId.trim().toLowerCase() && stored.password === password;
+export function verifyLogin(userId: string, password: string): Session | null {
+  const match = getStoredAccounts().find(
+    (a) => a.userId.trim().toLowerCase() === userId.trim().toLowerCase() && a.password === password,
+  );
+  return match ? { userId: match.userId, role: match.role, nombre: match.nombre } : null;
 }
 
 export function changePassword(
@@ -37,27 +56,36 @@ export function changePassword(
   currentPassword: string,
   newPassword: string,
 ): { success: true } | { success: false; error: string } {
-  const stored = getStoredCredentials();
+  const accounts = getStoredAccounts();
+  const idx = accounts.findIndex(
+    (a) => a.userId.trim().toLowerCase() === userId.trim().toLowerCase() && a.password === currentPassword,
+  );
 
-  if (stored.userId.trim().toLowerCase() !== userId.trim().toLowerCase() || stored.password !== currentPassword) {
+  if (idx === -1) {
     return { success: false, error: "Usuario o contraseña actual incorrectos." };
   }
   if (newPassword.length < 6) {
     return { success: false, error: "La nueva contraseña debe tener al menos 6 caracteres." };
   }
 
-  saveCredentials({ userId: stored.userId, password: newPassword });
+  accounts[idx] = { ...accounts[idx], password: newPassword };
+  saveAccounts(accounts);
   return { success: true };
 }
 
-export function getStoredSession(): string | null {
-  return localStorage.getItem(SESSION_KEY);
+export function getStoredSession(): Session | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
 }
 
-export function saveSession(userId: string) {
-  localStorage.setItem(SESSION_KEY, userId);
+export function saveSession(session: Session) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }

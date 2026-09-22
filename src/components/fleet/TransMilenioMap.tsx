@@ -1,16 +1,21 @@
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Fragment, useState } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvent } from "react-leaflet";
+import { Fragment, useMemo, useState } from "react";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvent } from "react-leaflet";
 import { buses } from "@/data/buses";
 import { BOGOTA_CENTER, busPositions, troncales } from "@/data/routes";
+import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { STATUS_LABEL } from "@/lib/status";
 import type { Bus, BusStatus } from "@/types/bus";
+import type { ActiveTrip } from "@/types/driver";
 
 const STATUS_COLOR: Record<BusStatus, string> = {
   operacion: "#22c55e",
   mantenimiento: "#eab308",
   "fuera-servicio": "#6b6b76",
 };
+
+const LIVE_TRIP_COLOR = "#3b82f6";
 
 const STATION_ZOOM_THRESHOLD = 15;
 
@@ -21,9 +26,41 @@ function useCurrentZoom(initialZoom: number) {
   return zoom;
 }
 
+function liveTripIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<span class="relative flex size-4">
+      <span class="absolute inline-flex size-full animate-ping rounded-full opacity-75" style="background-color:${LIVE_TRIP_COLOR}"></span>
+      <span class="relative flex size-4 items-center justify-center rounded-full ring-2 ring-base-950" style="background-color:${LIVE_TRIP_COLOR}"></span>
+    </span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function formatStartedAt(iso: string) {
+  return new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+}
+
 function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
   const zoom = useCurrentZoom(12);
   const showStationLabels = zoom >= STATION_ZOOM_THRESHOLD;
+  const activeTrips = useActiveTrips();
+  const icon = useMemo(() => liveTripIcon(), []);
+  const activeBusIds = useMemo(() => new Set(activeTrips.map((t) => t.busId)), [activeTrips]);
+
+  function openReport(busId: string, fallback: Partial<Bus>) {
+    const match = buses.find((b) => b.id === busId);
+    onSelectBus?.(
+      match ?? {
+        id: busId,
+        placa: fallback.placa ?? busId,
+        troncal: fallback.troncal ?? "",
+        ubicacion: fallback.ubicacion ?? "",
+        estado: "operacion",
+      },
+    );
+  }
 
   return (
     <>
@@ -61,7 +98,7 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
 
       {buses.map((bus) => {
         const pos = busPositions[bus.id];
-        if (!pos) return null;
+        if (!pos || activeBusIds.has(bus.id)) return null;
         return (
           <CircleMarker
             key={bus.id}
@@ -90,6 +127,34 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
               )}
             </Popup>
           </CircleMarker>
+        );
+      })}
+
+      {activeTrips.map((trip: ActiveTrip) => {
+        const pos = busPositions[trip.busId];
+        if (!pos) return null;
+        return (
+          <Marker key={trip.busId} position={pos} icon={icon}>
+            <Popup>
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
+                <span className="size-1.5 rounded-full bg-blue-600" />
+                En vivo
+              </p>
+              <p className="mt-1 text-sm font-bold text-base-950">{trip.placa}</p>
+              <p className="text-xs text-base-500">{trip.troncal}</p>
+              <p className="mt-1 text-xs text-base-600">
+                {trip.driverName} · salió {formatStartedAt(trip.startedAt)}
+              </p>
+              {onSelectBus && (
+                <button
+                  onClick={() => openReport(trip.busId, { placa: trip.placa, troncal: trip.troncal })}
+                  className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-500"
+                >
+                  Ver reporte →
+                </button>
+              )}
+            </Popup>
+          </Marker>
         );
       })}
     </>
