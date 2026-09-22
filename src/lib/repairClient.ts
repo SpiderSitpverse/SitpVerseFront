@@ -10,7 +10,11 @@ export interface RepairClient {
   getRequests(): RepairRequest[];
   acceptRequest(id: string, mecanicoId: string, mecanicoNombre: string): void;
   getReports(): RepairReport[];
-  submitReport(report: RepairReport): void;
+  getReport(requestId: string): RepairReport | undefined;
+  /** Upserts the report without touching the request's estado — progress is kept, service stays open. */
+  saveDraft(report: RepairReport): void;
+  /** Upserts the report and marks the request "completada" — this is what closes out the service. */
+  finalizeReport(report: RepairReport): void;
   subscribe(callback: () => void): () => void;
 }
 
@@ -63,8 +67,19 @@ class LocalStorageRepairClient implements RepairClient {
     return readList<RepairReport>(REPORTS_KEY, []);
   }
 
-  submitReport(report: RepairReport): void {
-    writeList(REPORTS_KEY, [report, ...this.getReports()]);
+  getReport(requestId: string): RepairReport | undefined {
+    return this.getReports().find((r) => r.requestId === requestId);
+  }
+
+  saveDraft(report: RepairReport): void {
+    const reports = this.getReports();
+    const idx = reports.findIndex((r) => r.requestId === report.requestId);
+    const next = idx === -1 ? [report, ...reports] : reports.map((r, i) => (i === idx ? report : r));
+    writeList(REPORTS_KEY, next);
+  }
+
+  finalizeReport(report: RepairReport): void {
+    this.saveDraft(report);
     writeList(
       REQUESTS_KEY,
       this.getRequests().map((r) => (r.id === report.requestId ? { ...r, estado: "completada" as const } : r)),

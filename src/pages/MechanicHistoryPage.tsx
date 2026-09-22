@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { ClipboardList, Eye, Wrench } from "lucide-react";
 import { useState } from "react";
 import { RepairFormModal } from "@/components/mechanic/RepairFormModal";
-import { RepairReportModal } from "@/components/mechanic/RepairReportModal";
+import { RepairReportModal } from "@/components/repairs/RepairReportModal";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
@@ -19,8 +19,8 @@ export function MechanicHistoryPage() {
 
   const mine = requests.filter((r) => r.mecanicoId === userId).sort((a, b) => (a.estado === b.estado ? 0 : a.estado === "aceptada" ? -1 : 1));
 
-  function handleSubmit(report: RepairReport) {
-    repairClient.submitReport(report);
+  function handleFinalize(report: RepairReport) {
+    repairClient.finalizeReport(report);
     setFormRequest(null);
   }
 
@@ -87,7 +87,7 @@ export function MechanicHistoryPage() {
                       className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
                     >
                       <ClipboardList className="size-3.5" />
-                      Llenar formato
+                      {report ? "Continuar formato" : "Llenar formato"}
                     </button>
                   )}
                 </div>
@@ -103,7 +103,7 @@ export function MechanicHistoryPage() {
         request={formRequest}
         mecanicoId={userId ?? ""}
         mecanicoNombre={nombre ?? userId ?? ""}
-        onSubmit={handleSubmit}
+        onFinalize={handleFinalize}
       />
 
       <RepairReportModal

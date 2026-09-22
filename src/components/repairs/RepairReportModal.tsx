@@ -95,7 +95,7 @@ export function RepairReportModal({
             <div className="flex items-center gap-1.5 text-xs text-base-500">
               <CalendarClock className="size-3.5" />
               {report.mecanicoNombre} ·{" "}
-              {new Date(report.completadaEn).toLocaleString("es-CO", {
+              {new Date(report.completadaEn ?? report.actualizadoEn).toLocaleString("es-CO", {
                 dateStyle: "medium",
                 timeStyle: "short",
               })}

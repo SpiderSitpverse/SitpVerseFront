@@ -28,5 +28,8 @@ export interface RepairReport {
   fotosPiezas: string[];
   mecanicoId: string;
   mecanicoNombre: string;
-  completadaEn: string;
+  /** Updated on every save, draft or final. */
+  actualizadoEn: string;
+  /** Only set once "Finalizar servicio" is pressed. */
+  completadaEn?: string;
 }

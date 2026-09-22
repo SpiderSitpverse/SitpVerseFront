@@ -5,13 +5,14 @@ import { RepairFormModal } from "@/components/mechanic/RepairFormModal";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useRepairRequests } from "@/hooks/useRepairs";
+import { useRepairReports, useRepairRequests } from "@/hooks/useRepairs";
 import { repairClient } from "@/lib/repairClient";
 import type { RepairReport, RepairRequest } from "@/types/repair";
 
 export function MechanicHomePage() {
   const { userId, nombre } = useAuth();
   const requests = useRepairRequests();
+  const reports = useRepairReports();
   const [formRequest, setFormRequest] = useState<RepairRequest | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -30,10 +31,10 @@ export function MechanicHomePage() {
     setFormRequest({ ...request, estado: "aceptada", mecanicoId: userId, mecanicoNombre: nombre ?? userId });
   }
 
-  function handleSubmit(report: RepairReport) {
-    repairClient.submitReport(report);
+  function handleFinalize(report: RepairReport) {
+    repairClient.finalizeReport(report);
     setFormRequest(null);
-    setConfirmation("Reparación guardada. El bus ya quedó registrado como reparado.");
+    setConfirmation("Servicio finalizado. El bus ya quedó registrado como reparado.");
   }
 
   return (
@@ -58,33 +59,41 @@ export function MechanicHomePage() {
         <div className="mb-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-base-400">En reparación</p>
           <div className="space-y-3">
-            {mine.map((req, index) => (
-              <motion.div
-                key={req.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-              >
-                <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-status-warning/10 text-status-warning">
-                      <Wrench className="size-5" />
+            {mine.map((req, index) => {
+              const hasDraft = reports.some((r) => r.requestId === req.id);
+              return (
+                <motion.div
+                  key={req.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                >
+                  <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-status-warning/10 text-status-warning">
+                        <Wrench className="size-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-base-100">{req.placa}</p>
+                        <p className="text-xs text-base-400">{req.troncal}</p>
+                      </div>
+                      {hasDraft && (
+                        <span className="rounded-full bg-status-online/10 px-2 py-0.5 text-[10px] font-medium text-status-online ring-1 ring-inset ring-status-online/25">
+                          Borrador guardado
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-base-100">{req.placa}</p>
-                      <p className="text-xs text-base-400">{req.troncal}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setFormRequest(req)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
-                  >
-                    <ClipboardList className="size-3.5" />
-                    Llenar formato
-                  </button>
-                </Card>
-              </motion.div>
-            ))}
+                    <button
+                      onClick={() => setFormRequest(req)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
+                    >
+                      <ClipboardList className="size-3.5" />
+                      {hasDraft ? "Continuar formato" : "Llenar formato"}
+                    </button>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -138,7 +147,7 @@ export function MechanicHomePage() {
         request={formRequest}
         mecanicoId={userId ?? ""}
         mecanicoNombre={nombre ?? userId ?? ""}
-        onSubmit={handleSubmit}
+        onFinalize={handleFinalize}
       />
     </div>
   );
