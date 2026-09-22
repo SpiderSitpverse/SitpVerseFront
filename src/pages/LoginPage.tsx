@@ -11,7 +11,7 @@ import { changePassword } from "@/lib/auth";
 type View = "login" | "change-password";
 
 export function LoginPage() {
-  const { userId, login } = useAuth();
+  const { userId, role, login } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("login");
 
@@ -27,18 +27,19 @@ export function LoginPage() {
   const [changeSuccess, setChangeSuccess] = useState(false);
 
   if (userId) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={role === "conductor" ? "/conductor" : "/"} replace />;
   }
 
   function handleLogin(e: FormEvent) {
     e.preventDefault();
     setLoginError(null);
 
-    if (!login(loginId, loginPassword)) {
+    const loggedInRole = login(loginId, loginPassword);
+    if (!loggedInRole) {
       setLoginError("Usuario o contraseña incorrectos.");
       return;
     }
-    navigate("/", { replace: true });
+    navigate(loggedInRole === "conductor" ? "/conductor" : "/", { replace: true });
   }
 
   function handleChangePassword(e: FormEvent) {

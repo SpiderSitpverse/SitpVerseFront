@@ -1,0 +1,34 @@
+export type Role = "admin" | "conductor";
+
+export interface AssignedRoute {
+  driverId: string;
+  busId: string;
+  placa: string;
+  troncal: string;
+  turno: string;
+  horaSalida: string;
+}
+
+export interface ActiveTrip {
+  busId: string;
+  placa: string;
+  troncal: string;
+  driverId: string;
+  driverName: string;
+  startedAt: string;
+}
+
+export type HelpRequestStatus = "pendiente" | "aceptada";
+
+export interface HelpRequest {
+  id: string;
+  busId: string;
+  placa: string;
+  driverId: string;
+  driverName: string;
+  motivo: string;
+  detalle: string;
+  createdAt: string;
+  status: HelpRequestStatus;
+  aceptadoPor?: string;
+}
