@@ -1,5 +1,4 @@
-import { Bell, Menu } from "lucide-react";
-import { LiveBadge } from "@/components/ui/LiveBadge";
+import { Menu } from "lucide-react";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { useLiveClock } from "@/hooks/useLiveClock";
 
@@ -23,13 +22,6 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
           <span className="h-3 w-px bg-base-600" />
           <span className="font-mono tabular-nums text-base-100">{clock.time}</span>
         </div>
-
-        <LiveBadge />
-
-        <button className="relative flex size-9 items-center justify-center rounded-lg text-base-300 ring-1 ring-inset ring-base-700 transition-colors hover:bg-base-800 hover:text-base-100">
-          <Bell className="size-[18px]" />
-          <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-brand-500" />
-        </button>
       </div>
     </header>
   );
