@@ -13,6 +13,12 @@ import { busReportClient } from "@/lib/busReportClient";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
 
+const SEND_EVERY_MS = 3000;
+/** Hasta este margen de error (metros) una lectura se considera precisa. */
+const PRECISE_METERS = 50;
+/** Tras una lectura precisa, durante este tiempo se ignoran las imprecisas. */
+const IMPRECISE_GRACE_MS = 30_000;
+
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
   const activeTrips = useActiveTrips();
@@ -22,6 +28,7 @@ export function DriverHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lastSent = useRef(0);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
 
   const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
@@ -31,17 +38,33 @@ export function DriverHomePage() {
   const busId = assignment?.busId;
   useEffect(() => {
     if (!started || !busId || !("geolocation" in navigator)) return;
+    let lastPrecise = 0;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        const { latitude, longitude, accuracy: meters } = pos.coords;
+        setAccuracy(Math.round(meters));
         const now = Date.now();
-        if (now - lastSent.current < 3000) return;
+        if (now - lastSent.current < SEND_EVERY_MS) return;
+        // Las lecturas por wifi/IP pueden errar cientos de metros: se descartan mientras haya una buena reciente.
+        // Si no llega ninguna precisa (p. ej. un PC sin GPS), se envía lo que haya para que el bus no desaparezca.
+        if (meters <= PRECISE_METERS) lastPrecise = now;
+        else if (now - lastPrecise < IMPRECISE_GRACE_MS) return;
         lastSent.current = now;
-        fleetActivityClient.sendPosition(busId, pos.coords.latitude, pos.coords.longitude).catch(() => undefined);
+        fleetActivityClient.sendPosition(busId, latitude, longitude).catch(() => undefined);
       },
-      () => setError("No se pudo obtener tu ubicación. Activa el permiso de ubicación del navegador para que el mapa te siga."),
-      { enableHighAccuracy: true, maximumAge: 2000 },
+      (err) =>
+        setError(
+          err.code === err.PERMISSION_DENIED
+            ? "No se pudo obtener tu ubicación. Activa el permiso de ubicación del navegador para que el mapa te siga."
+            : "Señal de ubicación débil. Si estás en interiores, acércate a una ventana o usa el celular con GPS.",
+        ),
+      // maximumAge 0: siempre una lectura nueva (no una guardada); timeout: no esperar para siempre.
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
     );
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      setAccuracy(null);
+    };
   }, [started, busId]);
 
   useEffect(() => {
@@ -154,6 +177,14 @@ export function DriverHomePage() {
                 <div className="flex items-center justify-between">
                   <dt className="text-base-400">Hora de salida</dt>
                   <dd className="font-medium text-base-100">{assignment.horaSalida}</dd>
+                </div>
+              )}
+              {started && accuracy !== null && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-base-400">Precisión de ubicación</dt>
+                  <dd className={`font-medium ${accuracy <= PRECISE_METERS ? "text-status-online" : "text-status-danger"}`}>
+                    ±{accuracy} m
+                  </dd>
                 </div>
               )}
               {activeTrip && (

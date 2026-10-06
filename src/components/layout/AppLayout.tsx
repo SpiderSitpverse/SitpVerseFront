@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bus, LayoutDashboard, Settings, TriangleAlert, Users, Wrench, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { NotificationToasts } from "@/components/layout/NotificationToasts";
 import { Sidebar, type NavItem } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 
@@ -39,6 +40,7 @@ export function AppLayout({ navItems = ADMIN_NAV_ITEMS }: { navItems?: NavItem[]
           </AnimatePresence>
         </main>
       </div>
+      <NotificationToasts />
     </div>
   );
 }

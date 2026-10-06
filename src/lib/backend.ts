@@ -1,5 +1,6 @@
 import { api, ApiError } from "@/lib/api";
 import { mapInspection } from "@/lib/mappers";
+import { clearNotifications, pushNotification } from "@/lib/notifications";
 import { connectRealtime, type AssistanceEvent, type FleetPositionEvent } from "@/lib/realtime";
 import { createStore } from "@/lib/store";
 import type {
@@ -113,9 +114,76 @@ function applyPosition(event: FleetPositionEvent) {
   if (statusChanged) void api<ApiBus[]>("/fleet/buses").then((v) => busesStore.set(v));
 }
 
+/** Los eventos más viejos que esto (reenviados al reconectar) no se avisan: ya no son noticia. */
+const NOTIFY_MAX_AGE_MS = 2 * 60_000;
+
+interface EventPayload {
+  busId?: string;
+  type?: string;
+  kind?: "DRIVER_SUPPORT" | "REPAIR";
+  description?: string | null;
+  slots?: number;
+  remainingSlots?: number;
+  rewardPoints?: number;
+  resent?: boolean;
+  reportedById?: string;
+  reportedBy?: { name?: string };
+}
+
+/**
+ * Aviso emergente según el rol (los eventos ya llegan filtrados por sala desde el back):
+ *  - ADMIN: un conductor reportó un problema (`incident.reported`).
+ *  - DRIVER / MECHANICAL: el admin abrió o reenvió una alerta con cupos (`call.opened`).
+ */
+function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event: AssistanceEvent) {
+  if (Date.now() - new Date(event.occurredAt).getTime() > NOTIFY_MAX_AGE_MS) return;
+  const p = event.payload as EventPayload;
+  const plate = busesStore.get().find((b) => b.id === p.busId)?.plate;
+
+  if (role === "ADMIN" && event.type === "incident.reported") {
+    pushNotification({
+      id: event.eventId,
+      title: "Nuevo reporte de conductor",
+      body: `${p.reportedBy?.name ?? "Un conductor"}${plate ? ` · ${plate}` : ""}: ${p.type ?? "problema"}`,
+      detail: p.description ?? undefined,
+      to: "/incidentes",
+    });
+    return;
+  }
+
+  if (event.type !== "call.opened") return;
+  if (role === "DRIVER") {
+    // El conductor que reportó el problema no necesita el aviso de su propia alerta.
+    if (userId && p.reportedById === userId) return;
+    pushNotification({
+      id: event.eventId,
+      title: p.resent ? "Alerta de apoyo reenviada" : "Un compañero necesita apoyo",
+      body: `${plate ? `Bus ${plate}` : "Un bus"}: ${p.description ?? "requiere asistencia"}`,
+      detail: callDetail(p),
+      to: "/conductor/ayuda",
+    });
+  } else if (role === "MECHANICAL") {
+    pushNotification({
+      id: event.eventId,
+      title: p.resent ? "Solicitud de reparación reenviada" : "Nueva solicitud de reparación",
+      body: `${plate ? `Bus ${plate}` : "Un bus"}: ${p.description ?? "requiere reparación"}`,
+      detail: callDetail(p),
+      to: "/taller",
+    });
+  }
+}
+
+function callDetail(p: EventPayload): string | undefined {
+  const parts: string[] = [];
+  const slots = p.remainingSlots ?? p.slots;
+  if (slots !== undefined) parts.push(`${slots} cupo${slots === 1 ? "" : "s"} disponible${slots === 1 ? "" : "s"}`);
+  if (p.rewardPoints) parts.push(`${p.rewardPoints} puntos`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
 let stopFn: (() => void) | null = null;
 
-export function startSync(role: ApiRole, token: string, onUnauthorized: () => void) {
+export function startSync(role: ApiRole, token: string, onUnauthorized: () => void, userId?: string) {
   stopSync();
   activeLoaders = loaders(role);
   void refreshAll();
@@ -124,7 +192,8 @@ export function startSync(role: ApiRole, token: string, onUnauthorized: () => vo
     onPosition: (event) => {
       if (role !== "DRIVER") applyPosition(event);
     },
-    onAssistance: (_event: AssistanceEvent) => {
+    onAssistance: (event: AssistanceEvent) => {
+      notifyAssistanceEvent(role, userId, event);
       void refreshAssistance(role);
     },
     onUnauthorized,
@@ -152,6 +221,7 @@ export function stopSync() {
   fleetSummaryStore.set(null);
   assistanceSummaryStore.set(null);
   inspectionsStore.set({});
+  clearNotifications();
 }
 
 /** `GET /inspections/buses/:id/latest` (404 = nunca inspeccionado). Se cachea por bus. */

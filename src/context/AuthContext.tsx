@@ -33,12 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Con sesión: cargar los datos del rol y mantenerlos al día (WebSocket). Sin sesión: vaciar la caché.
   const sessionRole = session?.role;
+  const sessionUserId = session?.userId;
   useEffect(() => {
     const token = getToken();
     if (!sessionRole || !token) return;
-    startSync(apiRoleOf(sessionRole), token, endSession);
+    startSync(apiRoleOf(sessionRole), token, endSession, sessionUserId);
     return stopSync;
-  }, [sessionRole]);
+  }, [sessionRole, sessionUserId]);
 
   // Al recargar, confirma que el token sigue valiendo (GET /auth/me) y refresca el nombre.
   useEffect(() => {
