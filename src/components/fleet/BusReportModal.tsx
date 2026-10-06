@@ -26,6 +26,8 @@ export function BusReportModal({ bus: selected, onClose }: { bus: Bus | null; on
   const fileRef = useRef<HTMLInputElement>(null);
   const report = useBusReport(bus?.id);
   const fotos = report?.fotos ?? [];
+  // Imagen de portada: la foto que puso el admin; si no hay, la que subió el conductor en su última inspección.
+  const cover = bus?.foto ?? fotos[0];
 
   async function changePhoto(file: File | undefined) {
     if (!file || !bus) return;
@@ -72,8 +74,8 @@ export function BusReportModal({ bus: selected, onClose }: { bus: Bus | null; on
                 disabled={fotos.length === 0}
                 className="group relative block w-full bg-base-100 text-left disabled:cursor-default"
               >
-                {bus.foto ? (
-                  <img src={bus.foto} alt={`Foto del bus ${bus.placa}`} className="aspect-video w-full object-cover" />
+                {cover ? (
+                  <img src={cover} alt={`Foto del bus ${bus.placa}`} className="aspect-video w-full object-cover" />
                 ) : (
                   <div className="p-6">
                     <BusBlueprint className="h-auto w-full" />
