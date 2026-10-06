@@ -33,9 +33,10 @@ export class GpsFilter {
 
   /**
    * @param speedMetersPerSecond cuánto puede moverse el vehículo entre lecturas (la incertidumbre crece con el
-   *   tiempo). 3 m/s funciona bien para un bus urbano visto cada 1–3 s sin conocer su velocidad real.
+   *   tiempo). 2 m/s por defecto: un bus quieto o en tráfico lento no se "arrastra" con el ruido; cuando el GPS
+   *   reporta velocidad real (un bus en marcha) se usa esa.
    */
-  constructor(speedMetersPerSecond = 3) {
+  constructor(speedMetersPerSecond = 2) {
     this.speedMetersPerSecond = speedMetersPerSecond;
   }
 
@@ -45,6 +46,11 @@ export class GpsFilter {
 
   get initialized() {
     return this.variance >= 0;
+  }
+
+  /** Posición estimada actual, sin incorporar ninguna lectura nueva (`null` si aún no hay ninguna). */
+  get estimate(): FilteredFix | null {
+    return this.variance < 0 ? null : { lat: this.lat, lng: this.lng, accuracy: Math.sqrt(this.variance) };
   }
 
   update(fix: GpsFix): FilteredFix {

@@ -1,6 +1,6 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvent } from "react-leaflet";
 import { BOGOTA_CENTER, troncales } from "@/data/routes";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
@@ -132,7 +132,28 @@ function LiveBusMarker({ trip, icon, onOpenReport }: { trip: ActiveTrip; icon: L
   );
 }
 
-export function TransMilenioMap({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
+/** Modo "marcar punto": un clic en el mapa entrega las coordenadas y el cursor pasa a ser una mira. */
+function PickPosition({ onPick }: { onPick: (point: [number, number]) => void }) {
+  const map = useMap();
+  useMapEvent("click", (e) => onPick([e.latlng.lat, e.latlng.lng]));
+  useEffect(() => {
+    const container = map.getContainer();
+    container.style.cursor = "crosshair";
+    return () => {
+      container.style.cursor = "";
+    };
+  }, [map]);
+  return null;
+}
+
+export function TransMilenioMap({
+  onSelectBus,
+  onPickPosition,
+}: {
+  onSelectBus?: (bus: Bus) => void;
+  /** Si se pasa, el mapa entra en modo "marcar punto" (el clic ya no abre popups). */
+  onPickPosition?: (point: [number, number]) => void;
+}) {
   return (
     <MapContainer center={BOGOTA_CENTER} zoom={12} scrollWheelZoom className="size-full">
       <TileLayer
@@ -146,6 +167,7 @@ export function TransMilenioMap({ onSelectBus }: { onSelectBus?: (bus: Bus) => v
         maxZoom={18}
         maxNativeZoom={16}
       />
+      {onPickPosition && <PickPosition onPick={onPickPosition} />}
 
       <RouteLayers onSelectBus={onSelectBus} />
     </MapContainer>

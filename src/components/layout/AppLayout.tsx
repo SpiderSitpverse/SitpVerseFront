@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { NotificationToasts } from "@/components/layout/NotificationToasts";
 import { Sidebar, type NavItem } from "@/components/layout/Sidebar";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { Topbar } from "@/components/layout/Topbar";
 
 export const ADMIN_NAV_ITEMS: NavItem[] = [
@@ -36,6 +37,7 @@ export function AppLayout({ navItems = ADMIN_NAV_ITEMS }: { navItems?: NavItem[]
         </main>
       </div>
       <NotificationToasts />
+      <UpdateBanner />
     </div>
   );
 }
