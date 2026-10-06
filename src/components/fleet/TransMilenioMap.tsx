@@ -5,15 +5,8 @@ import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip
 import { BOGOTA_CENTER, troncales } from "@/data/routes";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { useBuses } from "@/hooks/useFleetData";
-import { STATUS_LABEL } from "@/lib/status";
-import type { Bus, BusStatus } from "@/types/bus";
+import type { Bus } from "@/types/bus";
 import type { ActiveTrip } from "@/types/driver";
-
-const STATUS_COLOR: Record<BusStatus, string> = {
-  operacion: "#22c55e",
-  mantenimiento: "#eab308",
-  "fuera-servicio": "#6b6b76",
-};
 
 const LIVE_TRIP_COLOR = "#3b82f6";
 
@@ -48,7 +41,6 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
   const activeTrips = useActiveTrips();
   const buses = useBuses();
   const icon = useMemo(() => liveTripIcon(), []);
-  const activeBusIds = useMemo(() => new Set(activeTrips.map((t) => t.busId)), [activeTrips]);
 
   function openReport(busId: string, fallback: Partial<Bus>) {
     const match = buses.find((b) => b.id === busId);
@@ -97,39 +89,7 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
         </Fragment>
       ))}
 
-      {buses.map((bus) => {
-        if (bus.lat === undefined || bus.lng === undefined || activeBusIds.has(bus.id)) return null;
-        return (
-          <CircleMarker
-            key={bus.id}
-            center={[bus.lat, bus.lng]}
-            radius={7}
-            pathOptions={{
-              color: "#0f0f11",
-              weight: 2,
-              fillColor: STATUS_COLOR[bus.estado],
-              fillOpacity: 1,
-            }}
-          >
-            <Popup>
-              <p className="text-sm font-bold text-base-950">{bus.placa}</p>
-              <p className="text-xs text-base-500">
-                {bus.troncal} · {bus.ubicacion}
-              </p>
-              <p className="mt-1 text-xs font-medium text-base-700">{STATUS_LABEL[bus.estado]}</p>
-              {onSelectBus && (
-                <button
-                  onClick={() => onSelectBus(bus)}
-                  className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-500"
-                >
-                  Ver reporte →
-                </button>
-              )}
-            </Popup>
-          </CircleMarker>
-        );
-      })}
-
+      {/* El mapa muestra SOLO los buses con viaje en curso (los de reposo o finalizados no se dibujan). */}
       {activeTrips.map((trip: ActiveTrip) => {
         if (trip.lat === undefined || trip.lng === undefined) return null;
         return (
