@@ -1,24 +1,34 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { Check, Clock, HandHeart, TriangleAlert } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useHelpRequests } from "@/hooks/useFleetActivity";
+import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
+import { timeAgo } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
-function timeAgo(iso: string) {
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return "hace un momento";
-  if (minutes === 1) return "hace 1 min";
-  if (minutes < 60) return `hace ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  return hours === 1 ? "hace 1 h" : `hace ${hours} h`;
-}
-
 export function DriverHelpPage() {
-  const { userId, nombre } = useAuth();
+  const { userId } = useAuth();
   const requests = useHelpRequests();
+  const [error, setError] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState<string | null>(null);
+
+  async function accept(id: string) {
+    setError(null);
+    setAccepting(id);
+    try {
+      await fleetActivityClient.acceptHelpRequest(id);
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.reason === "FULL" ? "Los cupos de esta alerta ya fueron tomados." : e instanceof Error ? e.message : "No se pudo aceptar.",
+      );
+    } finally {
+      setAccepting(null);
+    }
+  }
 
   const fromOthers = requests.filter((r) => r.driverId !== userId);
   const mine = requests.filter((r) => r.driverId === userId);
@@ -29,6 +39,13 @@ export function DriverHelpPage() {
         title="Ayuda a compañeros"
         subtitle="Solicitudes de ayuda de otros conductores en la vía — acepta la que puedas atender."
       />
+
+      {error && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-status-danger/10 px-3.5 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       <div className="space-y-3">
         {fromOthers.length === 0 && (
@@ -81,11 +98,12 @@ export function DriverHelpPage() {
 
                 {req.status === "pendiente" && (
                   <button
-                    onClick={() => fleetActivityClient.acceptHelpRequest(req.id, nombre ?? userId ?? "")}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-status-online/10 px-3 py-1.5 text-xs font-semibold text-status-online ring-1 ring-inset ring-status-online/25 transition-colors hover:bg-status-online/15"
+                    onClick={() => accept(req.id)}
+                    disabled={accepting === req.id}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-status-online/10 px-3 py-1.5 text-xs font-semibold text-status-online ring-1 ring-inset ring-status-online/25 transition-colors hover:bg-status-online/15 disabled:opacity-60"
                   >
                     <HandHeart className="size-3.5" />
-                    Aceptar y apoyar
+                    {accepting === req.id ? "Aceptando..." : "Aceptar y apoyar"}
                   </button>
                 )}
               </div>

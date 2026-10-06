@@ -32,12 +32,17 @@ export interface BusReport {
 
 export type IncidentSeverity = "critico" | "alerta" | "info";
 
+export type IncidentState = "reportado" | "ayuda-solicitada";
+
 export interface Incident {
   id: string;
+  busId: string;
+  placa: string;
   titulo: string;
   descripcion: string;
+  reportadoPor: string;
   severidad: IncidentSeverity;
-  hace: string;
-  rutasAlternas: string[];
-  instruccionesSugeridas: string[];
+  estado: IncidentState;
+  /** ISO de cuando se reportó. */
+  creadoEn: string;
 }

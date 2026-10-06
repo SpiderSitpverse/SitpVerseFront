@@ -1,5 +1,6 @@
 import { ImagePlus, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { uploadPhoto } from "@/lib/api";
 import { resizeImageFile } from "@/lib/image";
 
 interface PhotoUploadFieldProps {
@@ -12,6 +13,7 @@ interface PhotoUploadFieldProps {
 export function PhotoUploadField({ label, photos, onChange, max = 6 }: PhotoUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -20,11 +22,15 @@ export function PhotoUploadField({ label, photos, onChange, max = 6 }: PhotoUplo
     const room = max - photos.length;
     const selected = Array.from(files).slice(0, room);
 
+    setUploading(true);
     try {
-      const resized = await Promise.all(selected.map((f) => resizeImageFile(f)));
-      onChange([...photos, ...resized]);
-    } catch {
-      setError("No se pudo cargar una de las fotos. Intenta de nuevo.");
+      // Cada foto se reduce y se sube al back (POST /files/images); se guarda la URL que devuelve.
+      const urls = await Promise.all(selected.map(async (f) => uploadPhoto(await resizeImageFile(f))));
+      onChange([...photos, ...urls]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir una de las fotos. Intenta de nuevo.");
+    } finally {
+      setUploading(false);
     }
 
     if (inputRef.current) inputRef.current.value = "";
@@ -57,11 +63,12 @@ export function PhotoUploadField({ label, photos, onChange, max = 6 }: PhotoUplo
         {photos.length < max && (
           <button
             type="button"
+            disabled={uploading}
             onClick={() => inputRef.current?.click()}
-            className="flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-base-600 text-base-400 transition-colors hover:border-brand-500/50 hover:text-brand-400"
+            className="flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-base-600 text-base-400 transition-colors hover:border-brand-500/50 hover:text-brand-400 disabled:opacity-50"
           >
             <ImagePlus className="size-5" />
-            <span className="text-[10px] font-medium">Agregar</span>
+            <span className="text-[10px] font-medium">{uploading ? "Subiendo..." : "Agregar"}</span>
           </button>
         )}
       </div>

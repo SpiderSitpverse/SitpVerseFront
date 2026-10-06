@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
-import { busReportClient } from "@/lib/busReportClient";
+import { useEffect } from "react";
+import { inspectionsStore, loadLatestInspection } from "@/lib/backend";
+import { useStore } from "@/lib/store";
 import type { BusReport } from "@/types/bus";
 
-/** La inspección más reciente de un bus. Al conectar: GET /inspections/buses/:id/latest. */
+/** La inspección más reciente de un bus: GET /inspections/buses/:id/latest (se carga al abrir). */
 export function useBusReport(busId: string | undefined): BusReport | undefined {
-  const [, bump] = useState(0);
+  const reports = useStore(inspectionsStore);
 
   useEffect(() => {
-    return busReportClient.subscribe(() => bump((n) => n + 1));
-  }, []);
+    if (busId) void loadLatestInspection(busId).catch(() => undefined);
+  }, [busId]);
 
   if (!busId) return undefined;
-  return busReportClient.getReport(busId);
+  return reports[busId] ?? undefined;
 }

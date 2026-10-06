@@ -35,7 +35,7 @@ export function UsersPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-base-100">{user.nombre}</p>
-                <p className="truncate text-xs text-base-400">{user.sector ?? "—"}</p>
+                <p className="truncate text-xs text-base-400">N.º {user.numeroEmpleado}{user.activo ? "" : " · inactivo"}</p>
               </div>
               <Badge>{user.rol}</Badge>
             </div>

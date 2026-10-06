@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bus as BusIcon, Check, CircleStop, Clock, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PreTripInspectionModal, type PreTripInspection } from "@/components/driver/PreTripInspectionModal";
 import { ReportProblemModal } from "@/components/driver/ReportProblemModal";
 import { TransMilenioMap } from "@/components/fleet/TransMilenioMap";
@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAssignedRoute } from "@/hooks/useFleetData";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { busReportClient } from "@/lib/busReportClient";
+import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
 
 export function DriverHomePage() {
@@ -18,10 +19,30 @@ export function DriverHomePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const lastSent = useRef(0);
 
   const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
   const started = Boolean(activeTrip);
+
+  // Con el viaje en curso, comparte la ubicación del bus (PATCH /fleet/buses/:id/position, §6).
+  const busId = assignment?.busId;
+  useEffect(() => {
+    if (!started || !busId || !("geolocation" in navigator)) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (now - lastSent.current < 3000) return;
+        lastSent.current = now;
+        fleetActivityClient.sendPosition(busId, pos.coords.latitude, pos.coords.longitude).catch(() => undefined);
+      },
+      () => setError("No se pudo obtener tu ubicación. Activa el permiso de ubicación del navegador para que el mapa te siga."),
+      { enableHighAccuracy: true, maximumAge: 2000 },
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [started, busId]);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -29,55 +50,38 @@ export function DriverHomePage() {
     return () => clearTimeout(id);
   }, [confirmation]);
 
-  function handleInspectionSubmit(inspection: PreTripInspection) {
-    if (!assignment || !userId) return;
+  async function run(action: () => Promise<void>, done: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      setConfirmation(done);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo completar la acción.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-    busReportClient.saveReport(assignment.busId, {
-      nombre: nombre ?? userId,
-      rol: "Conductor",
-      fecha: new Date().toLocaleString("es-CO", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      nota: inspection.nota,
-      comentario: inspection.comentario || inspection.nota,
-      fotos: inspection.fotos,
-    });
-
-    fleetActivityClient.startTrip({
-      busId: assignment.busId,
-      placa: assignment.placa,
-      troncal: assignment.troncal,
-      driverId: userId,
-      driverName: nombre ?? userId,
-      startedAt: new Date().toISOString(),
-    });
-
+  // Los modales muestran el error si estas promesas fallan.
+  async function handleInspectionSubmit(inspection: PreTripInspection) {
+    if (!assignment) return;
+    await busReportClient.saveReport(assignment.busId, inspection);
+    await fleetActivityClient.startTrip(assignment.busId);
     setInspectionOpen(false);
     setConfirmation("Ruta iniciada. Tu reporte de inspección ya es visible para el administrador.");
   }
 
   function handleFinish() {
     if (!assignment) return;
-    fleetActivityClient.endTrip(assignment.busId);
-    setConfirmation("Ruta finalizada. Ya no apareces como bus activo.");
+    void run(() => fleetActivityClient.endTrip(assignment.busId), "Ruta finalizada. Ya no apareces como bus activo.");
   }
 
-  function handleReportSubmit(motivo: string, detalle: string) {
-    if (!assignment || !userId) return;
-    fleetActivityClient.createHelpRequest({
-      busId: assignment.busId,
-      placa: assignment.placa,
-      driverId: userId,
-      driverName: nombre ?? userId,
-      motivo,
-      detalle,
-    });
+  async function handleReportSubmit(motivo: string, detalle: string) {
+    if (!assignment) return;
+    await fleetActivityClient.reportIncident(assignment.busId, motivo, detalle);
     setReportOpen(false);
-    setConfirmation("Alerta enviada. Los demás conductores fueron notificados.");
+    setConfirmation("Reporte enviado. Administración fue notificada y decidirá cuántos conductores necesita.");
   }
 
   if (!assignment) {
@@ -91,6 +95,13 @@ export function DriverHomePage() {
   return (
     <div>
       <PageHeader title="Mi ruta" subtitle={`Hola, ${nombre ?? userId}. Esta es tu asignación de hoy.`} />
+
+      {error && (
+        <div className="mb-5 flex items-start gap-2 rounded-lg bg-status-danger/10 px-3.5 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       <AnimatePresence>
         {confirmation && (
@@ -133,14 +144,18 @@ export function DriverHomePage() {
             </div>
 
             <dl className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-base-400">Turno</dt>
-                <dd className="font-medium text-base-100">{assignment.turno}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-base-400">Hora de salida</dt>
-                <dd className="font-medium text-base-100">{assignment.horaSalida}</dd>
-              </div>
+              {assignment.turno && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-base-400">Turno</dt>
+                  <dd className="font-medium text-base-100">{assignment.turno}</dd>
+                </div>
+              )}
+              {assignment.horaSalida && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-base-400">Hora de salida</dt>
+                  <dd className="font-medium text-base-100">{assignment.horaSalida}</dd>
+                </div>
+              )}
               {activeTrip && (
                 <div className="flex items-center justify-between">
                   <dt className="text-base-400">Iniciaste a las</dt>
@@ -159,6 +174,7 @@ export function DriverHomePage() {
               {!started ? (
                 <button
                   onClick={() => setInspectionOpen(true)}
+                  disabled={busy}
                   className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
                 >
                   Iniciar ruta
@@ -174,6 +190,7 @@ export function DriverHomePage() {
                   </button>
                   <button
                     onClick={handleFinish}
+                    disabled={busy}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-base-800 px-4 py-2.5 text-sm font-semibold text-base-100 ring-1 ring-inset ring-base-600 transition-colors hover:bg-base-700"
                   >
                     <CircleStop className="size-4" />

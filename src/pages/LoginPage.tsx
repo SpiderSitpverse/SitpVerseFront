@@ -26,6 +26,7 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changeError, setChangeError] = useState<string | null>(null);
   const [changeSuccess, setChangeSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   if (userId) {
     return <Navigate to={roleHome(role)} replace />;
@@ -35,7 +36,9 @@ export function LoginPage() {
     e.preventDefault();
     setLoginError(null);
 
+    setSubmitting(true);
     const result = await login(loginId, loginPassword);
+    setSubmitting(false);
     if (!result.success) {
       setLoginError(result.error);
       return;
@@ -52,7 +55,9 @@ export function LoginPage() {
       return;
     }
 
+    setSubmitting(true);
     const result = await changePassword(changeId, currentPassword, newPassword);
+    setSubmitting(false);
     if (!result.success) {
       setChangeError(result.error);
       return;
@@ -125,8 +130,8 @@ export function LoginPage() {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                   <TextField
-                    label="Usuario"
-                    placeholder="Tu ID de usuario"
+                    label="Número de empleado"
+                    placeholder="Ej. 2001"
                     autoComplete="username"
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
@@ -151,9 +156,10 @@ export function LoginPage() {
 
                   <button
                     type="submit"
-                    className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
+                    disabled={submitting}
+                    className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
                   >
-                    Iniciar sesión
+                    {submitting ? "Ingresando..." : "Iniciar sesión"}
                   </button>
                 </form>
 
@@ -198,8 +204,8 @@ export function LoginPage() {
                   <>
                     <form onSubmit={handleChangePassword} className="space-y-4">
                       <TextField
-                        label="Usuario"
-                        placeholder="Tu ID de usuario"
+                        label="Número de empleado"
+                        placeholder="Ej. 2001"
                         autoComplete="username"
                         value={changeId}
                         onChange={(e) => setChangeId(e.target.value)}
@@ -217,7 +223,7 @@ export function LoginPage() {
                       <TextField
                         label="Nueva contraseña"
                         type="password"
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mínimo 8, con letras y números"
                         autoComplete="new-password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -242,9 +248,10 @@ export function LoginPage() {
 
                       <button
                         type="submit"
-                        className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
+                        disabled={submitting}
+                        className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
                       >
-                        Guardar contraseña
+                        {submitting ? "Guardando..." : "Guardar contraseña"}
                       </button>
                     </form>
 

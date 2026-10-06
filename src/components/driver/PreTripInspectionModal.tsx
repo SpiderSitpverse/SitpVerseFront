@@ -14,7 +14,7 @@ interface PreTripInspectionModalProps {
   open: boolean;
   onClose: () => void;
   assignment: AssignedRoute;
-  onSubmit: (inspection: PreTripInspection) => void;
+  onSubmit: (inspection: PreTripInspection) => Promise<void>;
 }
 
 export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: PreTripInspectionModalProps) {
@@ -22,6 +22,7 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
   const [comentario, setComentario] = useState("");
   const [fotos, setFotos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   function reset() {
     setNota("Inspección de turno sin novedades");
@@ -35,7 +36,7 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
     onClose();
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!nota.trim()) {
       setError("Escribe una nota corta antes de continuar.");
@@ -45,8 +46,16 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
       setError("Sube al menos una foto del bus antes de iniciar la ruta.");
       return;
     }
-    onSubmit({ nota: nota.trim(), comentario: comentario.trim(), fotos });
-    reset();
+    setError(null);
+    setSending(true);
+    try {
+      await onSubmit({ nota: nota.trim(), comentario: comentario.trim(), fotos });
+      reset();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar el reporte.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -96,10 +105,11 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
 
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
+            disabled={sending}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
           >
             <Send className="size-4" />
-            Enviar reporte e iniciar ruta
+            {sending ? "Enviando..." : "Enviar reporte e iniciar ruta"}
           </button>
         </form>
       </div>

@@ -5,8 +5,9 @@ export interface AssignedRoute {
   busId: string;
   placa: string;
   troncal: string;
-  turno: string;
-  horaSalida: string;
+  /** El back aún no maneja turnos: si no vienen, la pantalla no los muestra. */
+  turno?: string;
+  horaSalida?: string;
 }
 
 export interface ActiveTrip {

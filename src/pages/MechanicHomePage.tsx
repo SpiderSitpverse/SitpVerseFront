@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
-import { Check, ClipboardList, MapPin, Wrench } from "lucide-react";
+import { Check, ClipboardList, MapPin, TriangleAlert, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RepairFormModal } from "@/components/mechanic/RepairFormModal";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useRepairReports, useRepairRequests } from "@/hooks/useRepairs";
+import { ApiError } from "@/lib/api";
 import { repairClient } from "@/lib/repairClient";
 import type { RepairReport, RepairRequest } from "@/types/repair";
 
@@ -15,6 +16,8 @@ export function MechanicHomePage() {
   const reports = useRepairReports();
   const [formRequest, setFormRequest] = useState<RepairRequest | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -25,14 +28,28 @@ export function MechanicHomePage() {
   const pending = requests.filter((r) => r.estado === "pendiente");
   const mine = requests.filter((r) => r.estado === "aceptada" && r.mecanicoId === userId);
 
-  function handleAccept(request: RepairRequest) {
+  async function handleAccept(request: RepairRequest) {
     if (!userId) return;
-    repairClient.acceptRequest(request.id, userId, nombre ?? userId);
-    setFormRequest({ ...request, estado: "aceptada", mecanicoId: userId, mecanicoNombre: nombre ?? userId });
+    setError(null);
+    setAccepting(request.id);
+    try {
+      await repairClient.acceptRequest(request.id);
+      setFormRequest({ ...request, estado: "aceptada", mecanicoId: userId, mecanicoNombre: nombre ?? userId });
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 409
+          ? "Otro mecánico ya tomó esta solicitud."
+          : e instanceof Error
+            ? e.message
+            : "No se pudo aceptar la solicitud.",
+      );
+    } finally {
+      setAccepting(null);
+    }
   }
 
-  function handleFinalize(report: RepairReport) {
-    repairClient.finalizeReport(report);
+  async function handleFinalize(report: RepairReport) {
+    await repairClient.finalizeReport(report);
     setFormRequest(null);
     setConfirmation("Servicio finalizado. El bus ya quedó registrado como reparado.");
   }
@@ -43,6 +60,13 @@ export function MechanicHomePage() {
         title="Solicitudes de reparación"
         subtitle={`Hola, ${nombre ?? userId}. Acepta una solicitud para empezar a trabajar en ella.`}
       />
+
+      {error && (
+        <div className="mb-5 flex items-start gap-2 rounded-lg bg-status-danger/10 px-3.5 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {confirmation && (
         <motion.div
@@ -130,10 +154,11 @@ export function MechanicHomePage() {
 
                 <button
                   onClick={() => handleAccept(req)}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-status-online/10 px-3.5 py-2 text-xs font-semibold text-status-online ring-1 ring-inset ring-status-online/25 transition-colors hover:bg-status-online/15"
+                  disabled={accepting === req.id}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-status-online/10 px-3.5 py-2 text-xs font-semibold text-status-online ring-1 ring-inset ring-status-online/25 transition-colors hover:bg-status-online/15 disabled:opacity-60"
                 >
                   <Check className="size-3.5" />
-                  Aceptar reparación
+                  {accepting === req.id ? "Aceptando..." : "Aceptar reparación"}
                 </button>
               </div>
             </Card>

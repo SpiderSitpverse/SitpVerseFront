@@ -1,38 +1,64 @@
+import { useMemo } from "react";
+import {
+  assistanceSummaryStore,
+  busesStore,
+  callsStore,
+  fleetSummaryStore,
+  homeStore,
+  incidentsStore,
+  staffStore,
+} from "@/lib/backend";
+import { mapAssignedRoute, mapBus, mapIncident, mapStaff } from "@/lib/mappers";
+import { useStore } from "@/lib/store";
+import { useAuth } from "@/context/AuthContext";
 import type { Bus, FleetSummary, Incident } from "@/types/bus";
 import type { AssignedRoute } from "@/types/driver";
 import type { StaffMember } from "@/types/user";
 
-/**
- * Puntos de conexión con el back (contrato en SitpVerseBack/docs/API.md).
- * Hoy devuelven vacío: al conectar, cada hook carga con su GET (y se refresca por
- * WebSocket cuando aplica) sin tocar las pantallas, que ya manejan el estado vacío.
- */
+/** Datos de flota que lee el front. Todo viene del back vía `lib/backend.ts` (docs/API.md). */
 
-const NO_BUSES: Bus[] = [];
-const NO_INCIDENTS: Incident[] = [];
-const NO_STAFF: StaffMember[] = [];
-
-/** GET /fleet/buses — lat/lng salen de `latitude`/`longitude`. */
+/** GET /fleet/buses — el estado "mantenimiento" sale de las alertas de reparación abiertas. */
 export function useBuses(): Bus[] {
-  return NO_BUSES;
+  const buses = useStore(busesStore);
+  const calls = useStore(callsStore);
+  return useMemo(() => {
+    const inRepair = new Set(calls.filter((c) => c.kind === "REPAIR" && c.status !== "COMPLETED").map((c) => c.busId));
+    return buses.map((bus) => mapBus(bus, inRepair));
+  }, [buses, calls]);
 }
 
-/** GET /fleet/summary + GET /assistance/summary. */
+/** GET /fleet/summary + GET /assistance/summary (solo ADMIN). */
 export function useFleetSummary(): FleetSummary | null {
-  return null;
+  const fleet = useStore(fleetSummaryStore);
+  const assistance = useStore(assistanceSummaryStore);
+  return useMemo(
+    () =>
+      fleet
+        ? { total: fleet.total, enOperacion: fleet.inService, incidentesHoy: assistance?.incidentsLast24h ?? 0 }
+        : null,
+    [fleet, assistance],
+  );
 }
 
 /** GET /fleet/home/operativo — el bus asignado al conductor que inició sesión. */
 export function useAssignedRoute(): AssignedRoute | null {
-  return null;
+  const home = useStore(homeStore);
+  const { userId } = useAuth();
+  return useMemo(() => (home && userId ? mapAssignedRoute(home, userId) : null), [home, userId]);
 }
 
-/** GET /assistance/incidents. */
+/** GET /assistance/incidents (solo ADMIN). */
 export function useIncidents(): Incident[] {
-  return NO_INCIDENTS;
+  const incidents = useStore(incidentsStore);
+  const buses = useStore(busesStore);
+  return useMemo(() => {
+    const plates = new Map(buses.map((b) => [b.id, b.plate]));
+    return incidents.map((i) => mapIncident(i, (busId) => plates.get(busId) ?? "—"));
+  }, [incidents, buses]);
 }
 
 /** GET /users (solo ADMIN). */
 export function useStaff(): StaffMember[] {
-  return NO_STAFF;
+  const users = useStore(staffStore);
+  return useMemo(() => users.map(mapStaff), [users]);
 }

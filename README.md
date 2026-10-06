@@ -36,21 +36,22 @@ Cada página (`src/pages/*`) compone componentes de `ui/`, `layout/` y del domin
 
 ## Conexión con el back
 
-El front **no trae datos de ejemplo**: todo arranca vacío y las pantallas muestran su estado vacío
-hasta conectar el back (NestJS, contrato en `SitpVerseBack/docs/API.md`). Los puntos de conexión son:
+El front consume el back NestJS (contrato en `SitpVerseBack/docs/API.md`). La URL sale de
+`VITE_API_URL` (ver `.env.example`; `.env.production` apunta al back desplegado en Azure).
 
-| Qué | Dónde | Endpoint del back |
-| --- | --- | --- |
-| Login / cambio de contraseña | `src/lib/auth.ts` (`verifyLogin`, `changePassword`) | `POST /auth/login` (por `employeeId`) |
-| Buses, resumen, ruta asignada, incidentes, personal | `src/hooks/useFleetData.ts` | `/fleet/*`, `/assistance/*`, `/users` |
-| Reporte de inspección de un bus | `src/lib/busReportClient.ts`, `src/hooks/useBusReport.ts` | `/inspections/buses/:id/latest` |
-| Viajes activos y llamados de ayuda | `src/lib/fleetActivityClient.ts` | `/fleet/*`, `/assistance/*` + WebSocket `/realtime` |
-| Reparaciones del taller | `src/lib/repairClient.ts` | flujo de reparaciones de API.md |
+| Qué | Dónde |
+| --- | --- |
+| Cliente HTTP, JWT en sessionStorage, subida de fotos (`POST /files/images`) | `src/lib/api.ts` |
+| Login por número de empleado, `/auth/me`, cambio de contraseña | `src/lib/auth.ts`, `src/context/AuthContext.tsx` |
+| Caché en memoria por rol + refresco (WebSocket `/realtime` + respaldo cada 20 s) | `src/lib/backend.ts`, `src/lib/realtime.ts` |
+| Traducción back → tipos del front (tabla de API.md §3) | `src/lib/mappers.ts` |
+| Hooks que leen la caché | `src/hooks/useFleetData.ts`, `useFleetActivity.ts`, `useRepairs.ts`, `useBusReport.ts` |
+| Acciones (viajes, alertas, reparaciones, inspecciones) | `src/lib/fleetActivityClient.ts`, `repairClient.ts`, `busReportClient.ts` |
 
-Los clientes `*Client` exponen una interfaz y hoy una implementación en `localStorage`; basta con
-sustituir la implementación por llamadas HTTP. La URL del back va en `VITE_API_URL`
-(p. ej. `https://sitpverse2026-api.azurewebsites.net`). Las fotos deben subirse a
-`POST /files/images` y guardar la URL devuelta.
+Un `401` en cualquier petición cierra la sesión. El conductor comparte su ubicación
+(`navigator.geolocation` → `PATCH /fleet/buses/:id/position`) mientras tiene un viaje iniciado.
+Las métricas de Reportes (ocupación, velocidad, km) y los turnos aún no existen en el back, así
+que esas pantallas muestran "—".
 
 ## Mapa de troncales
 

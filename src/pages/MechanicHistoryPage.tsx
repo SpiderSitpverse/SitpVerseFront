@@ -19,8 +19,8 @@ export function MechanicHistoryPage() {
 
   const mine = requests.filter((r) => r.mecanicoId === userId).sort((a, b) => (a.estado === b.estado ? 0 : a.estado === "aceptada" ? -1 : 1));
 
-  function handleFinalize(report: RepairReport) {
-    repairClient.finalizeReport(report);
+  async function handleFinalize(report: RepairReport) {
+    await repairClient.finalizeReport(report);
     setFormRequest(null);
   }
 

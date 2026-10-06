@@ -14,7 +14,7 @@ interface RepairFormModalProps {
   request: RepairRequest | null;
   mecanicoId: string;
   mecanicoNombre: string;
-  onFinalize: (report: RepairReport) => void;
+  onFinalize: (report: RepairReport) => Promise<void>;
 }
 
 function RepairFormModalBody({
@@ -26,7 +26,7 @@ function RepairFormModalBody({
   request: RepairRequest;
   mecanicoId: string;
   mecanicoNombre: string;
-  onFinalize: (report: RepairReport) => void;
+  onFinalize: (report: RepairReport) => Promise<void>;
 }) {
   const draft = repairClient.getReport(request.id);
   const [danos, setDanos] = useState(draft?.danosEncontrados ?? "");
@@ -38,6 +38,7 @@ function RepairFormModalBody({
   const [fotosPiezas, setFotosPiezas] = useState<string[]>(draft?.fotosPiezas ?? []);
   const [error, setError] = useState<string | null>(null);
   const [savedJustNow, setSavedJustNow] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!savedJustNow) return;
@@ -76,17 +77,33 @@ function RepairFormModalBody({
     };
   }
 
-  function handleSaveDraft() {
-    repairClient.saveDraft(buildReport());
-    setSavedJustNow(true);
+  async function handleSaveDraft() {
+    setError(null);
+    setBusy(true);
+    try {
+      await repairClient.saveDraft(buildReport());
+      setSavedJustNow(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar el borrador.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function handleFinalize() {
+  async function handleFinalize() {
     if (!danos.trim()) {
       setError("Describe los daños encontrados antes de finalizar.");
       return;
     }
-    onFinalize({ ...buildReport(), completadaEn: new Date().toISOString() });
+    setError(null);
+    setBusy(true);
+    try {
+      await onFinalize({ ...buildReport(), completadaEn: new Date().toISOString() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo finalizar el servicio.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -183,7 +200,8 @@ function RepairFormModalBody({
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-base-800 px-4 py-2.5 text-sm font-semibold text-base-100 ring-1 ring-inset ring-base-600 transition-colors hover:bg-base-700"
+            disabled={busy}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-base-800 px-4 py-2.5 text-sm font-semibold text-base-100 ring-1 ring-inset ring-base-600 transition-colors hover:bg-base-700 disabled:opacity-60"
           >
             <Save className="size-4" />
             Guardar
@@ -191,7 +209,8 @@ function RepairFormModalBody({
           <button
             type="button"
             onClick={handleFinalize}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
+            disabled={busy}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
           >
             <CheckCircle2 className="size-4" />
             Finalizar servicio

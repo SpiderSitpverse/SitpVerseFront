@@ -1,103 +1,58 @@
-import type { RepairReport, RepairRequest } from "@/types/repair";
+import { api, toRelativeUrl } from "@/lib/api";
+import { callsStore, refreshAll, repairReportsStore } from "@/lib/backend";
+import { mapRepairReport } from "@/lib/mappers";
+import type { ApiRepairReport } from "@/types/api";
+import type { RepairReport } from "@/types/repair";
 
 /**
- * Same shape as FleetActivityClient (see fleetActivityClient.ts): an
- * interface backed by localStorage today, swappable for a real backend
- * later without touching any component — everything goes through the hooks
- * in useRepairs.ts, never localStorage directly.
+ * Reparaciones contra el back (docs/API.md, "Mecánico"). El informe es un borrador editable
+ * hasta que se finaliza (`finalize: true`), momento en que la solicitud pasa a COMPLETED.
  */
-export interface RepairClient {
-  getRequests(): RepairRequest[];
-  acceptRequest(id: string, mecanicoId: string, mecanicoNombre: string): void;
-  getReports(): RepairReport[];
-  getReport(requestId: string): RepairReport | undefined;
-  /** Upserts the report without touching the request's estado — progress is kept, service stays open. */
-  saveDraft(report: RepairReport): void;
-  /** Upserts the report and marks the request "completada" — this is what closes out the service. */
-  finalizeReport(report: RepairReport): void;
-  subscribe(callback: () => void): () => void;
+
+function payload(report: RepairReport, finalize: boolean) {
+  return {
+    damages: report.danosEncontrados,
+    replacedParts: report.piezasReemplazadas,
+    expenses: report.gastos,
+    busPhotos: report.fotosBus.map(toRelativeUrl),
+    partPhotos: report.fotosPiezas.map(toRelativeUrl),
+    finalize,
+  };
 }
 
-const REQUESTS_KEY = "sitpverse.repairRequests";
-const REPORTS_KEY = "sitpverse.repairReports";
-const LOCAL_CHANGE_EVENT = "sitpverse:repair-changed";
+export const repairClient = {
+  /** El primero en aceptar se queda con la reparación; los demás reciben 409. */
+  async acceptRequest(callId: string): Promise<void> {
+    await api(`/assistance/calls/${callId}/accept`, { method: "POST" });
+    await refreshAll();
+  },
 
-function readList<T>(key: string, seed: T[]): T[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) {
-      localStorage.setItem(key, JSON.stringify(seed));
-      return seed;
-    }
-    const parsed = JSON.parse(raw) as T[];
-    return Array.isArray(parsed) ? parsed : seed;
-  } catch {
-    return seed;
-  }
-}
-
-function writeList<T>(key: string, list: T[]) {
-  localStorage.setItem(key, JSON.stringify(list));
-  window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT));
-}
-
-class LocalStorageRepairClient implements RepairClient {
-  private seedRequests: RepairRequest[];
-
-  constructor(seedRequests: RepairRequest[]) {
-    this.seedRequests = seedRequests;
-  }
-
-  getRequests(): RepairRequest[] {
-    return readList<RepairRequest>(REQUESTS_KEY, this.seedRequests);
-  }
-
-  acceptRequest(id: string, mecanicoId: string, mecanicoNombre: string): void {
-    writeList(
-      REQUESTS_KEY,
-      this.getRequests().map((r) =>
-        r.id === id && r.estado === "pendiente"
-          ? { ...r, estado: "aceptada" as const, mecanicoId, mecanicoNombre, aceptadaEn: new Date().toISOString() }
-          : r,
-      ),
-    );
-  }
-
-  getReports(): RepairReport[] {
-    return readList<RepairReport>(REPORTS_KEY, []);
-  }
-
+  /** Borrador del informe de una solicitud, si ya existe (sale de la caché). */
   getReport(requestId: string): RepairReport | undefined {
-    return this.getReports().find((r) => r.requestId === requestId);
-  }
+    const report = repairReportsStore.get().find((r) => r.callId === requestId);
+    if (!report) return undefined;
+    const busId = callsStore.get().find((c) => c.id === requestId)?.busId ?? "";
+    return mapRepairReport(report, busId);
+  },
 
-  saveDraft(report: RepairReport): void {
-    const reports = this.getReports();
-    const idx = reports.findIndex((r) => r.requestId === report.requestId);
-    const next = idx === -1 ? [report, ...reports] : reports.map((r, i) => (i === idx ? report : r));
-    writeList(REPORTS_KEY, next);
-  }
+  /** Guarda sin cerrar: el servicio sigue abierto. */
+  async saveDraft(report: RepairReport): Promise<void> {
+    await upsert(report, false);
+  },
 
-  finalizeReport(report: RepairReport): void {
-    this.saveDraft(report);
-    writeList(
-      REQUESTS_KEY,
-      this.getRequests().map((r) => (r.id === report.requestId ? { ...r, estado: "completada" as const } : r)),
-    );
-  }
+  /** Guarda y cierra el servicio (exige daños; después responde 409 `REPORT_FINALIZED`). */
+  async finalizeReport(report: RepairReport): Promise<void> {
+    await upsert(report, true);
+  },
+};
 
-  subscribe(callback: () => void): () => void {
-    function onStorage(e: StorageEvent) {
-      if (e.key === REQUESTS_KEY || e.key === REPORTS_KEY) callback();
-    }
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(LOCAL_CHANGE_EVENT, callback);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(LOCAL_CHANGE_EVENT, callback);
-    };
-  }
+async function upsert(report: RepairReport, finalize: boolean) {
+  const saved = await api<{ report: ApiRepairReport } | ApiRepairReport>(`/assistance/calls/${report.requestId}/repair-report`, {
+    method: "PUT",
+    body: payload(report, finalize),
+  });
+  const next = "report" in saved ? saved.report : saved;
+  const others = repairReportsStore.get().filter((r) => r.callId !== next.callId);
+  repairReportsStore.set([next, ...others]);
+  await refreshAll();
 }
-
-/** TODO: reemplazar por la implementación contra el back (ver docs/API.md, flujo de reparaciones). */
-export const repairClient: RepairClient = new LocalStorageRepairClient([]);

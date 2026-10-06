@@ -13,18 +13,28 @@ const MOTIVOS = [
 interface ReportProblemModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (motivo: string, detalle: string) => void;
+  onSubmit: (motivo: string, detalle: string) => Promise<void>;
 }
 
 export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemModalProps) {
   const [motivo, setMotivo] = useState(MOTIVOS[0]);
   const [detalle, setDetalle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit(motivo, detalle);
-    setMotivo(MOTIVOS[0]);
-    setDetalle("");
+    setError(null);
+    setSending(true);
+    try {
+      await onSubmit(motivo, detalle.trim());
+      setMotivo(MOTIVOS[0]);
+      setDetalle("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar el reporte.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -36,7 +46,7 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
           </div>
           <div>
             <h2 className="text-lg font-bold text-base-50">Reportar problema</h2>
-            <p className="text-sm text-base-400">Se notificará a otros conductores y al centro de control</p>
+            <p className="text-sm text-base-400">Se notificará al centro de control, que coordina la ayuda</p>
           </div>
         </div>
 
@@ -67,12 +77,19 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
             />
           </div>
 
+          {error && (
+            <p className="rounded-lg bg-status-danger/10 px-3 py-2 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
+              {error}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-status-danger px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-status-danger/20 transition-colors hover:bg-red-500"
+            disabled={sending}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-status-danger px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-status-danger/20 transition-colors hover:bg-red-500 disabled:opacity-60"
           >
             <Send className="size-4" />
-            Enviar alerta
+            {sending ? "Enviando..." : "Enviar alerta"}
           </button>
         </form>
       </div>
