@@ -52,9 +52,15 @@ export const fleetActivityClient = {
     await refreshAll();
   },
 
-  /** Admin o conductor: genera una solicitud de reparación para los mecánicos. */
-  async requestRepair(busId: string, description: string): Promise<void> {
-    await api("/assistance/bus-faults", { method: "POST", body: { busId, description: description || undefined } });
+  /**
+   * Admin o conductor: genera una solicitud de reparación para los mecánicos. Con `incidentId` queda ligada
+   * al incidente: si el admin lo elimina (y ningún mecánico la aceptó), la solicitud se elimina con él.
+   */
+  async requestRepair(busId: string, description: string, incidentId?: string): Promise<void> {
+    await api("/assistance/bus-faults", {
+      method: "POST",
+      body: { busId, incidentId, description: description || undefined },
+    });
     await refreshAll();
   },
 };

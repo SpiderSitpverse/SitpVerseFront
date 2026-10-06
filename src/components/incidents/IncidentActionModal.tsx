@@ -153,6 +153,7 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
                   fleetActivityClient.requestRepair(
                     incident.busId,
                     [incident.titulo, incident.descripcion].filter(Boolean).join(" — "),
+                    incident.id,
                   ),
                 () => setTeamSent(true),
               )
