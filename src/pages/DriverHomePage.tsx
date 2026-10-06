@@ -12,12 +12,17 @@ import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { busReportClient } from "@/lib/busReportClient";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
+import { GpsFilter } from "@/lib/gpsFilter";
 
 const SEND_EVERY_MS = 3000;
-/** Hasta este margen de error (metros) una lectura se considera precisa. */
-const PRECISE_METERS = 50;
-/** Tras una lectura precisa, durante este tiempo se ignoran las imprecisas. */
-const IMPRECISE_GRACE_MS = 30_000;
+/** Una lectura con este margen de error (metros) o mejor se considera "señal GPS buena". */
+const GOOD_FIX_METERS = 50;
+/**
+ * Al arrancar, el navegador da primero una ubicación aproximada (por red/wifi, con cientos de metros de error)
+ * y solo después engancha el GPS. Esas primeras lecturas no se usan: se espera una buena. Si en este tiempo no
+ * llega ninguna (p. ej. un PC sin GPS), se usa lo que haya para que el bus no desaparezca.
+ */
+const WARMUP_MS = 25_000;
 
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
@@ -29,28 +34,33 @@ export function DriverHomePage() {
   const [busy, setBusy] = useState(false);
   const lastSent = useRef(0);
   const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [hasFix, setHasFix] = useState(false);
 
   const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
   const started = Boolean(activeTrip);
+  // Con el viaje en curso pero sin una lectura utilizable todavía: "Buscando señal GPS…".
+  const searching = started && !hasFix;
 
   // Con el viaje en curso, comparte la ubicación del bus (PATCH /fleet/buses/:id/position, §6).
   const busId = assignment?.busId;
   useEffect(() => {
     if (!started || !busId || !("geolocation" in navigator)) return;
-    let lastPrecise = 0;
+    const filter = new GpsFilter();
+    const openedAt = Date.now();
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude, longitude, accuracy: meters } = pos.coords;
-        setAccuracy(Math.round(meters));
+        const { latitude, longitude, accuracy: meters, speed } = pos.coords;
         const now = Date.now();
+        setAccuracy(Math.round(meters));
+        // Arranque en frío: sin una lectura buena todavía, ni se usa ni se muestra (así el bus no "baila" entre calles).
+        if (meters > GOOD_FIX_METERS && now - openedAt < WARMUP_MS) return;
+        // Filtro de Kalman: pesa cada lectura según su margen de error, así el punto sigue al bus sin saltos.
+        const fixed = filter.update({ lat: latitude, lng: longitude, accuracy: meters, timestamp: pos.timestamp, speed });
+        setHasFix(true);
         if (now - lastSent.current < SEND_EVERY_MS) return;
-        // Las lecturas por wifi/IP pueden errar cientos de metros: se descartan mientras haya una buena reciente.
-        // Si no llega ninguna precisa (p. ej. un PC sin GPS), se envía lo que haya para que el bus no desaparezca.
-        if (meters <= PRECISE_METERS) lastPrecise = now;
-        else if (now - lastPrecise < IMPRECISE_GRACE_MS) return;
         lastSent.current = now;
-        fleetActivityClient.sendPosition(busId, latitude, longitude).catch(() => undefined);
+        fleetActivityClient.sendPosition(busId, fixed.lat, fixed.lng).catch(() => undefined);
       },
       (err) =>
         setError(
@@ -64,6 +74,7 @@ export function DriverHomePage() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
       setAccuracy(null);
+      setHasFix(false);
     };
   }, [started, busId]);
 
@@ -182,8 +193,12 @@ export function DriverHomePage() {
               {started && accuracy !== null && (
                 <div className="flex items-center justify-between">
                   <dt className="text-base-400">Precisión de ubicación</dt>
-                  <dd className={`font-medium ${accuracy <= PRECISE_METERS ? "text-status-online" : "text-status-danger"}`}>
-                    ±{accuracy} m
+                  <dd
+                    className={`font-medium ${
+                      searching ? "text-base-300" : accuracy <= GOOD_FIX_METERS ? "text-status-online" : "text-status-danger"
+                    }`}
+                  >
+                    {searching ? `Buscando señal GPS… (±${accuracy} m)` : `±${accuracy} m`}
                   </dd>
                 </div>
               )}

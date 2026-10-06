@@ -5,6 +5,7 @@ import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip
 import { BOGOTA_CENTER, troncales } from "@/data/routes";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { useBuses } from "@/hooks/useFleetData";
+import { useSmoothPosition } from "@/hooks/useSmoothPosition";
 import type { Bus } from "@/types/bus";
 import type { ActiveTrip } from "@/types/driver";
 
@@ -90,33 +91,44 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
       ))}
 
       {/* El mapa muestra SOLO los buses con viaje en curso (los de reposo o finalizados no se dibujan). */}
-      {activeTrips.map((trip: ActiveTrip) => {
-        if (trip.lat === undefined || trip.lng === undefined) return null;
-        return (
-          <Marker key={trip.busId} position={[trip.lat, trip.lng]} icon={icon}>
-            <Popup>
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
-                <span className="size-1.5 rounded-full bg-blue-600" />
-                En vivo
-              </p>
-              <p className="mt-1 text-sm font-bold text-base-950">{trip.placa}</p>
-              <p className="text-xs text-base-500">{trip.troncal}</p>
-              <p className="mt-1 text-xs text-base-600">
-                {trip.driverName} · salió {formatStartedAt(trip.startedAt)}
-              </p>
-              {onSelectBus && (
-                <button
-                  onClick={() => openReport(trip.busId, { placa: trip.placa, troncal: trip.troncal })}
-                  className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-500"
-                >
-                  Ver reporte →
-                </button>
-              )}
-            </Popup>
-          </Marker>
-        );
-      })}
+      {activeTrips.map((trip: ActiveTrip) => (
+        <LiveBusMarker
+          key={trip.busId}
+          trip={trip}
+          icon={icon}
+          onOpenReport={onSelectBus ? () => openReport(trip.busId, { placa: trip.placa, troncal: trip.troncal }) : undefined}
+        />
+      ))}
     </>
+  );
+}
+
+/** Un bus en vivo: su posición se pega a la línea de su troncal y se anima entre lecturas (ver useSmoothPosition). */
+function LiveBusMarker({ trip, icon, onOpenReport }: { trip: ActiveTrip; icon: L.DivIcon; onOpenReport?: () => void }) {
+  const position = useSmoothPosition(trip.lat, trip.lng, trip.troncal);
+  if (!position) return null;
+  return (
+    <Marker position={position} icon={icon}>
+      <Popup>
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
+          <span className="size-1.5 rounded-full bg-blue-600" />
+          En vivo
+        </p>
+        <p className="mt-1 text-sm font-bold text-base-950">{trip.placa}</p>
+        <p className="text-xs text-base-500">{trip.troncal}</p>
+        <p className="mt-1 text-xs text-base-600">
+          {trip.driverName} · salió {formatStartedAt(trip.startedAt)}
+        </p>
+        {onOpenReport && (
+          <button
+            onClick={onOpenReport}
+            className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-500"
+          >
+            Ver reporte →
+          </button>
+        )}
+      </Popup>
+    </Marker>
   );
 }
 
