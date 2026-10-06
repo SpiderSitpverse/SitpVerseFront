@@ -40,6 +40,18 @@ export const fleetActivityClient = {
     await refreshAll();
   },
 
+  /** Admin: elimina un incidente que nadie atendió. 409 si ya tiene aceptaciones o está terminado. */
+  async deleteIncident(incidentId: string): Promise<void> {
+    await api(`/assistance/incidents/${incidentId}`, { method: "DELETE" });
+    await refreshAll();
+  },
+
+  /** Admin: cambia la foto del bus (URL relativa que devolvió `POST /files/images`) o la quita con `null`. */
+  async setBusPhoto(busId: string, photoUrl: string | null): Promise<void> {
+    await api(`/fleet/buses/${busId}`, { method: "PATCH", body: { photoUrl } });
+    await refreshAll();
+  },
+
   /** Admin o conductor: genera una solicitud de reparación para los mecánicos. */
   async requestRepair(busId: string, description: string): Promise<void> {
     await api("/assistance/bus-faults", { method: "POST", body: { busId, description: description || undefined } });

@@ -1,5 +1,6 @@
-import { Check, Radio, Send, Wrench } from "lucide-react";
+import { Check, Radio, Send, Trash2, Wrench } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
@@ -64,6 +65,7 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
   const [reward, setReward] = useState(10);
   const [alertSent, setAlertSent] = useState(alreadyRequested);
   const [teamSent, setTeamSent] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function run(action: () => Promise<void>, done: () => void) {
@@ -166,6 +168,20 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
           </p>
         )}
 
+        <ActionRow
+          icon={Trash2}
+          title="Eliminar incidente"
+          description="Bórralo si se reportó por error. No se puede si ya hay alguien atendiéndolo."
+        >
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-status-danger/10 px-3 py-1.5 text-xs font-medium text-status-danger ring-1 ring-inset ring-status-danger/25 transition-colors hover:bg-status-danger/15"
+          >
+            <Trash2 className="size-3.5" />
+            Eliminar
+          </button>
+        </ActionRow>
+
         <button
           onClick={onClose}
           className="w-full rounded-lg bg-base-800 px-4 py-2.5 text-sm font-semibold text-base-100 ring-1 ring-inset ring-base-600 transition-colors hover:bg-base-700"
@@ -173,6 +189,21 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
           Cerrar
         </button>
       </div>
+
+      <ConfirmModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() =>
+          run(
+            () => fleetActivityClient.deleteIncident(incident.id),
+            () => onClose(),
+          )
+        }
+        icon={Trash2}
+        title="¿Eliminar este incidente?"
+        description={`Se borrará "${incident.titulo}" de ${incident.placa} junto con sus alertas sin atender. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 }

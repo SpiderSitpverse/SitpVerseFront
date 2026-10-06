@@ -31,8 +31,9 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
     setError(null);
   }
 
+  // Cerrar (Esc, X o clic fuera) NO borra lo escrito ni las fotos subidas: el conductor puede volver y seguir.
+  // El formulario solo se vacía después de enviarlo con éxito.
   function handleClose() {
-    reset();
     onClose();
   }
 

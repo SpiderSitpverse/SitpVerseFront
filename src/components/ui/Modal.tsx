@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -11,19 +11,34 @@ interface ModalProps {
   className?: string;
 }
 
+/** Ventanas abiertas, de la más antigua a la más reciente: Esc cierra solo la de arriba. */
+const openModals: symbol[] = [];
+
 export function Modal({ open, onClose, children, className }: ModalProps) {
+  // `onClose` suele ser una función nueva en cada render: se guarda en una ref para que el efecto
+  // dependa solo de `open` (si no, al re-renderizar la ventana "perdería su turno" en la pila).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
+    const id = Symbol("modal");
+    openModals.push(id);
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape" || openModals[openModals.length - 1] !== id) return;
+      e.stopPropagation();
+      onCloseRef.current();
     }
     window.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
+      openModals.splice(openModals.indexOf(id), 1);
+      if (openModals.length === 0) document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>

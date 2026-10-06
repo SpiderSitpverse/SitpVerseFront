@@ -10,6 +10,8 @@ export interface Bus {
   anio?: number;
   operador?: string;
   capacidad?: number;
+  /** URL de la foto real del bus; si no hay, se muestra el dibujo. */
+  foto?: string;
   ultimaActualizacion?: string;
   lat?: number;
   lng?: number;

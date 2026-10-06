@@ -24,6 +24,8 @@ export interface ApiBus {
   driverId: string | null;
   driver: string | null;
   tripStartedAt: string | null;
+  /** Foto real del bus (`/uploads/…`); la sube el administrador. */
+  photoUrl: string | null;
   updatedAt: string;
 }
 

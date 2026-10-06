@@ -47,6 +47,7 @@ export function mapBus(bus: ApiBus, repairBusIds: Set<string>): Bus {
     anio: bus.year ?? undefined,
     operador: bus.operator ?? undefined,
     capacidad: bus.capacity ?? undefined,
+    foto: bus.photoUrl ? toAbsoluteUrl(bus.photoUrl) : undefined,
     ultimaActualizacion: formatDateTime(bus.updatedAt),
     lat: num(bus.latitude),
     lng: num(bus.longitude),
