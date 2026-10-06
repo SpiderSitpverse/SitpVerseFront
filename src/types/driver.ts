@@ -16,6 +16,8 @@ export interface ActiveTrip {
   driverId: string;
   driverName: string;
   startedAt: string;
+  lat?: number;
+  lng?: number;
 }
 
 export type HelpRequestStatus = "pendiente" | "aceptada";

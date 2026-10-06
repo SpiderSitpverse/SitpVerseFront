@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
-import { buses } from "@/data/buses";
+import { useBuses } from "@/hooks/useFleetData";
 import type { Bus, BusStatus } from "@/types/bus";
 
 const FILTERS: { value: BusStatus | "todos"; label: string }[] = [
@@ -22,6 +22,7 @@ export function FleetPage() {
   const [filter, setFilter] = useState<BusStatus | "todos">("todos");
   const [query, setQuery] = useState("");
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
+  const buses = useBuses();
 
   const counts = useMemo(
     () => ({
@@ -30,7 +31,7 @@ export function FleetPage() {
       mantenimiento: buses.filter((b) => b.estado === "mantenimiento").length,
       "fuera-servicio": buses.filter((b) => b.estado === "fuera-servicio").length,
     }),
-    [],
+    [buses],
   );
 
   const filtered = useMemo(() => {
@@ -42,7 +43,7 @@ export function FleetPage() {
         bus.troncal.toLowerCase().includes(query.toLowerCase());
       return matchesFilter && matchesQuery;
     });
-  }, [filter, query]);
+  }, [buses, filter, query]);
 
   return (
     <div>

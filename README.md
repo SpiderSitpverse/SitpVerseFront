@@ -24,9 +24,9 @@ src/
     incidents/        Modal de acciones sobre un incidente (alertas, mantenimiento, rutas, instrucciones)
     layout/           Sidebar, Topbar, PageHeader, AppLayout (shell de la app)
     ui/               Componentes reutilizables genéricos (Button, Card, Badge, Modal, StatCard, Tabs, etc.)
-  context/            AuthContext (sesión simulada en localStorage)
-  data/               Datos mock tipados (buses, incidentes, reportes, rutas del mapa)
-  hooks/              Hooks reutilizables (reloj en vivo, contador animado)
+  context/            AuthContext (sesión por pestaña en sessionStorage)
+  data/               Geometría de referencia del mapa (troncales y estaciones oficiales)
+  hooks/              useFleetData (puntos de conexión con el back), reloj en vivo, contador animado
   lib/                Utilidades (cn, mapeos de estado/color, auth.ts)
   pages/              Una página por ruta (incluye LoginPage, pública)
   types/              Tipos de dominio compartidos
@@ -34,10 +34,23 @@ src/
 
 Cada página (`src/pages/*`) compone componentes de `ui/`, `layout/` y del dominio correspondiente — no hay lógica de UI duplicada entre páginas.
 
-## Sesión
+## Conexión con el back
 
-Autenticación simulada en `localStorage` (sin backend) — ver `src/lib/auth.ts`. Credenciales
-por defecto: usuario `admin`, contraseña `transmilenio2026`, editable desde la pantalla de login.
+El front **no trae datos de ejemplo**: todo arranca vacío y las pantallas muestran su estado vacío
+hasta conectar el back (NestJS, contrato en `SitpVerseBack/docs/API.md`). Los puntos de conexión son:
+
+| Qué | Dónde | Endpoint del back |
+| --- | --- | --- |
+| Login / cambio de contraseña | `src/lib/auth.ts` (`verifyLogin`, `changePassword`) | `POST /auth/login` (por `employeeId`) |
+| Buses, resumen, ruta asignada, incidentes, personal | `src/hooks/useFleetData.ts` | `/fleet/*`, `/assistance/*`, `/users` |
+| Reporte de inspección de un bus | `src/lib/busReportClient.ts`, `src/hooks/useBusReport.ts` | `/inspections/buses/:id/latest` |
+| Viajes activos y llamados de ayuda | `src/lib/fleetActivityClient.ts` | `/fleet/*`, `/assistance/*` + WebSocket `/realtime` |
+| Reparaciones del taller | `src/lib/repairClient.ts` | flujo de reparaciones de API.md |
+
+Los clientes `*Client` exponen una interfaz y hoy una implementación en `localStorage`; basta con
+sustituir la implementación por llamadas HTTP. La URL del back va en `VITE_API_URL`
+(p. ej. `https://sitpverse2026-api.azurewebsites.net`). Las fotos deben subirse a
+`POST /files/images` y guardar la URL devuelta.
 
 ## Mapa de troncales
 

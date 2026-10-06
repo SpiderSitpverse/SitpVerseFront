@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   label: string;
-  value: number;
+  /** `null` = sin dato todavía (se muestra "—"). */
+  value: number | null;
   icon: LucideIcon;
   tone?: "brand" | "success" | "warning" | "neutral";
   className?: string;
@@ -27,7 +28,7 @@ export function StatCard({ label, value, icon: Icon, tone = "neutral", className
       <div className="min-w-0">
         <p className="text-xs font-medium uppercase leading-snug tracking-wider text-base-400">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-base-50">
-          <AnimatedCounter value={value} />
+          {value === null ? "—" : <AnimatedCounter value={value} />}
         </p>
       </div>
     </Card>

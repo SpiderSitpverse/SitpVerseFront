@@ -15,18 +15,6 @@ export interface TroncalRoute {
 
 export const BOGOTA_CENTER: [number, number] = [4.65, -74.09];
 
-/** Approximate map position per bus id, matched to its reported `ubicacion`, snapped to real stations. */
-export const busPositions: Record<string, [number, number]> = {
-  "1": [4.6168, -74.07216], // Calle 26 - Atrio (Troncal Caracas)
-  "2": [4.68208, -74.12169], // Portal El Dorado (Calle 26)
-  "3": [4.67555, -74.06985], // Escuela Militar (Calle 80)
-  "4": [4.59735, -74.16933], // Portal Sur (NQS Sur)
-  "5": [4.70665, -74.07123], // Humedal Córdoba (Suba)
-  "6": [4.66867, -74.06024], // Héroes (Autopista Norte, cerca Calle 72)
-  "7": [4.75548, -74.04589], // Portal Norte (Autopista Norte)
-  "8": [4.63745, -74.09308], // Quinta Paredes (Calle 26)
-};
-
 /**
  * Real corridors and stations of the main troncales, sourced from
  * TransMilenio's own public digital-map API (mapadigital.transmilenio.gov.co),

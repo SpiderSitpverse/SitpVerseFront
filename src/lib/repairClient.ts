@@ -99,45 +99,5 @@ class LocalStorageRepairClient implements RepairClient {
   }
 }
 
-const SEED_REQUESTS: RepairRequest[] = [
-  {
-    id: "rr-1",
-    busId: "4",
-    placa: "TLM-1004",
-    troncal: "Troncal NQS",
-    ubicacion: "Patio Portal Sur",
-    problema:
-      "Durante el diagnóstico se detectó desgaste leve en los amortiguadores delanteros. El bus ingresó a taller por mantenimiento preventivo programado; también requiere revisión del sistema eléctrico.",
-    estado: "pendiente",
-  },
-  {
-    id: "rr-2",
-    busId: "7",
-    placa: "TLM-1007",
-    troncal: "Patio Portal",
-    ubicacion: "Patio Portal Norte",
-    problema:
-      "Falla eléctrica en el sistema de iluminación interior y el tablero de instrumentos. Unidad fuera de servicio a la espera de repuestos para el módulo de control.",
-    estado: "pendiente",
-  },
-  {
-    id: "rr-3",
-    busId: "845",
-    placa: "TLY-845",
-    troncal: "Troncal Caracas (H3)",
-    ubicacion: "Patio Portal Usme",
-    problema: "Ruido en el sistema de frenado del eje trasero, posible desgaste avanzado en las pastillas.",
-    estado: "pendiente",
-  },
-  {
-    id: "rr-4",
-    busId: "847",
-    placa: "TLY-847",
-    troncal: "C35",
-    ubicacion: "Talleres Fontibón",
-    problema: "Fuga de aceite detectada en el motor durante la inspección de patio; requiere revisión de juntas.",
-    estado: "pendiente",
-  },
-];
-
-export const repairClient: RepairClient = new LocalStorageRepairClient(SEED_REQUESTS);
+/** TODO: reemplazar por la implementación contra el back (ver docs/API.md, flujo de reparaciones). */
+export const repairClient: RepairClient = new LocalStorageRepairClient([]);

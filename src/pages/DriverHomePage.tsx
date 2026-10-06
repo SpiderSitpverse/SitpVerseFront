@@ -7,7 +7,7 @@ import { TransMilenioMap } from "@/components/fleet/TransMilenioMap";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { driverAssignments } from "@/data/driverAssignment";
+import { useAssignedRoute } from "@/hooks/useFleetData";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { busReportClient } from "@/lib/busReportClient";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
@@ -19,7 +19,7 @@ export function DriverHomePage() {
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
-  const assignment = userId ? driverAssignments[userId] : undefined;
+  const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
   const started = Boolean(activeTrip);
 

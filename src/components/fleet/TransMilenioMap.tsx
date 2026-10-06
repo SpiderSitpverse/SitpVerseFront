@@ -2,9 +2,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Fragment, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvent } from "react-leaflet";
-import { buses } from "@/data/buses";
-import { BOGOTA_CENTER, busPositions, troncales } from "@/data/routes";
+import { BOGOTA_CENTER, troncales } from "@/data/routes";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
+import { useBuses } from "@/hooks/useFleetData";
 import { STATUS_LABEL } from "@/lib/status";
 import type { Bus, BusStatus } from "@/types/bus";
 import type { ActiveTrip } from "@/types/driver";
@@ -46,6 +46,7 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
   const zoom = useCurrentZoom(12);
   const showStationLabels = zoom >= STATION_ZOOM_THRESHOLD;
   const activeTrips = useActiveTrips();
+  const buses = useBuses();
   const icon = useMemo(() => liveTripIcon(), []);
   const activeBusIds = useMemo(() => new Set(activeTrips.map((t) => t.busId)), [activeTrips]);
 
@@ -97,12 +98,11 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
       ))}
 
       {buses.map((bus) => {
-        const pos = busPositions[bus.id];
-        if (!pos || activeBusIds.has(bus.id)) return null;
+        if (bus.lat === undefined || bus.lng === undefined || activeBusIds.has(bus.id)) return null;
         return (
           <CircleMarker
             key={bus.id}
-            center={pos}
+            center={[bus.lat, bus.lng]}
             radius={7}
             pathOptions={{
               color: "#0f0f11",
@@ -131,10 +131,9 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
       })}
 
       {activeTrips.map((trip: ActiveTrip) => {
-        const pos = busPositions[trip.busId];
-        if (!pos) return null;
+        if (trip.lat === undefined || trip.lng === undefined) return null;
         return (
-          <Marker key={trip.busId} position={pos} icon={icon}>
+          <Marker key={trip.busId} position={[trip.lat, trip.lng]} icon={icon}>
             <Popup>
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
                 <span className="size-1.5 rounded-full bg-blue-600" />

@@ -31,19 +31,19 @@ export function LoginPage() {
     return <Navigate to={roleHome(role)} replace />;
   }
 
-  function handleLogin(e: FormEvent) {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setLoginError(null);
 
-    const loggedInRole = login(loginId, loginPassword);
-    if (!loggedInRole) {
-      setLoginError("Usuario o contraseña incorrectos.");
+    const result = await login(loginId, loginPassword);
+    if (!result.success) {
+      setLoginError(result.error);
       return;
     }
-    navigate(roleHome(loggedInRole), { replace: true });
+    navigate(roleHome(result.data), { replace: true });
   }
 
-  function handleChangePassword(e: FormEvent) {
+  async function handleChangePassword(e: FormEvent) {
     e.preventDefault();
     setChangeError(null);
 
@@ -52,7 +52,7 @@ export function LoginPage() {
       return;
     }
 
-    const result = changePassword(changeId, currentPassword, newPassword);
+    const result = await changePassword(changeId, currentPassword, newPassword);
     if (!result.success) {
       setChangeError(result.error);
       return;

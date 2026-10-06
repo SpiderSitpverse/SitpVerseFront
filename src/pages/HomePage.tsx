@@ -7,7 +7,8 @@ import heroFleet from "@/assets/media/home-hero-2.jpg";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { Card } from "@/components/ui/Card";
-import { fleetSummary } from "@/data/buses";
+import { useAuth } from "@/context/AuthContext";
+import { useFleetSummary } from "@/hooks/useFleetData";
 
 interface Module {
   to: string;
@@ -26,9 +27,12 @@ const MODULES: Module[] = [
 ];
 
 export function HomePage() {
+  const { nombre } = useAuth();
+  const summary = useFleetSummary();
+
   return (
     <div>
-      <PageHeader title="Consola principal" subtitle="Hola, Kevin. Bienvenido al sistema unificado de control TransMilenio." />
+      <PageHeader title="Consola principal" subtitle={`Hola, ${nombre?.split(" ")[0] ?? "bienvenido"}. Bienvenido al sistema unificado de control TransMilenio.`} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-2">
@@ -80,19 +84,19 @@ export function HomePage() {
               <div className="flex items-center justify-between">
                 <dt className="text-sm text-base-400">Flota total</dt>
                 <dd className="text-sm font-semibold text-base-50">
-                  <AnimatedCounter value={fleetSummary.total} />
+                  {summary ? <AnimatedCounter value={summary.total} /> : "—"}
                 </dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-sm text-base-400">En operación</dt>
                 <dd className="text-sm font-semibold text-status-online">
-                  <AnimatedCounter value={fleetSummary.enOperacion} />
+                  {summary ? <AnimatedCounter value={summary.enOperacion} /> : "—"}
                 </dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-sm text-base-400">Incidentes hoy</dt>
                 <dd className="text-sm font-semibold text-brand-500">
-                  <AnimatedCounter value={fleetSummary.incidentesHoy} />
+                  {summary ? <AnimatedCounter value={summary.incidentesHoy} /> : "—"}
                 </dd>
               </div>
             </dl>

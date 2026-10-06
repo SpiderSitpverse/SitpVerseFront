@@ -5,7 +5,7 @@ import { IncidentActionModal } from "@/components/incidents/IncidentActionModal"
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { SEVERITY_STYLE } from "@/lib/status";
-import { incidents } from "@/data/buses";
+import { useIncidents } from "@/hooks/useFleetData";
 import type { Incident, IncidentSeverity } from "@/types/bus";
 
 const SEVERITY_ICON: Record<IncidentSeverity, typeof AlertTriangle> = {
@@ -21,6 +21,7 @@ const SEVERITY_LABEL: Record<IncidentSeverity, string> = {
 };
 
 export function IncidentsPage() {
+  const incidents = useIncidents();
   const [selected, setSelected] = useState<Incident | null>(null);
 
   return (
@@ -28,6 +29,9 @@ export function IncidentsPage() {
       <PageHeader title="Incidentes" subtitle="Reporta y gestiona bloqueos, fallas en vía o desvíos de troncales." />
 
       <div className="space-y-3">
+        {incidents.length === 0 && (
+          <Card className="p-10 text-center text-sm text-base-400">No hay incidentes registrados.</Card>
+        )}
         {incidents.map((incident, index) => {
           const Icon = SEVERITY_ICON[incident.severidad];
           const style = SEVERITY_STYLE[incident.severidad];

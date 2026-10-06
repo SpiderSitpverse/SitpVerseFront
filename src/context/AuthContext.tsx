@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { clearSession, getStoredSession, saveSession, verifyLogin, type Session } from "@/lib/auth";
+import { clearSession, getStoredSession, saveSession, verifyLogin, type AuthResult, type Session } from "@/lib/auth";
 import type { Role } from "@/types/driver";
 
 interface AuthContextValue {
   userId: string | null;
   role: Role | null;
   nombre: string | null;
-  login: (userId: string, password: string) => Role | null;
+  login: (userId: string, password: string) => Promise<AuthResult<Role>>;
   logout: () => void;
 }
 
@@ -15,12 +15,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => getStoredSession());
 
-  function login(id: string, password: string) {
-    const result = verifyLogin(id, password);
-    if (!result) return null;
-    saveSession(result);
-    setSession(result);
-    return result.role;
+  async function login(id: string, password: string): Promise<AuthResult<Role>> {
+    const result = await verifyLogin(id, password);
+    if (!result.success) return result;
+    saveSession(result.data);
+    setSession(result.data);
+    return { success: true, data: result.data.role };
   }
 
   function logout() {

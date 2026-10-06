@@ -11,6 +11,14 @@ export interface Bus {
   operador?: string;
   capacidad?: number;
   ultimaActualizacion?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface FleetSummary {
+  total: number;
+  enOperacion: number;
+  incidentesHoy: number;
 }
 
 export interface BusReport {

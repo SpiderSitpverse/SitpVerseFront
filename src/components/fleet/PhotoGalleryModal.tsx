@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
@@ -32,30 +32,16 @@ export function PhotoGalleryModal({ open, onClose, photos, index, onIndexChange 
         <div className="relative">
           <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-base-800 to-base-900 ring-1 ring-inset ring-base-700">
             <AnimatePresence mode="wait">
-              {photos[index]?.startsWith("data:") ? (
-                <motion.img
-                  key={index}
-                  src={photos[index]}
-                  alt=""
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="size-full object-contain"
-                />
-              ) : (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="flex flex-col items-center gap-3 text-base-500"
-                >
-                  <ImageOff className="size-10" />
-                  <p className="px-6 text-center text-sm text-base-400">{photos[index]}</p>
-                </motion.div>
-              )}
+              <motion.img
+                key={index}
+                src={photos[index]}
+                alt=""
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="size-full object-contain"
+              />
             </AnimatePresence>
           </div>
 

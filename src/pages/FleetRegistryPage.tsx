@@ -8,21 +8,22 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { registryBuses } from "@/data/buses";
+import { useBuses } from "@/hooks/useFleetData";
 
 const TABS = ["Información", "Historial", "Documentos"] as const;
 
 export function FleetRegistryPage() {
-  const [selectedId, setSelectedId] = useState(registryBuses[3]?.id ?? registryBuses[0].id);
+  const buses = useBuses();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Información");
 
   const filtered = useMemo(
-    () => registryBuses.filter((b) => b.placa.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () => buses.filter((b) => b.placa.toLowerCase().includes(query.toLowerCase())),
+    [buses, query],
   );
 
-  const selected = registryBuses.find((b) => b.id === selectedId) ?? registryBuses[0];
+  const selected = buses.find((b) => b.id === selectedId) ?? buses[0];
 
   return (
     <div>
@@ -49,6 +50,7 @@ export function FleetRegistryPage() {
             className="mb-3"
           />
           <div className="space-y-1 overflow-y-auto" style={{ maxHeight: "30rem" }}>
+            {filtered.length === 0 && <p className="py-8 text-center text-sm text-base-400">Sin unidades registradas.</p>}
             {filtered.map((bus) => (
               <RegistryListItem
                 key={bus.id}
@@ -60,6 +62,11 @@ export function FleetRegistryPage() {
           </div>
         </Card>
 
+        {!selected ? (
+          <Card className="flex items-center justify-center p-10 text-sm text-base-400">
+            Selecciona una unidad para ver su registro.
+          </Card>
+        ) : (
         <motion.div
           key={selected.id}
           initial={{ opacity: 0, y: 8 }}
@@ -120,60 +127,28 @@ export function FleetRegistryPage() {
                   <dl className="space-y-2.5 text-sm">
                     <Row label="Última ubicación" value={selected.ubicacion} />
                     <Row label="Asignación troncal" value={selected.troncal} />
-                    <Row label="Capacidad" value={`${selected.capacidad ?? "—"} pasajeros`} />
-                    <Row label="Última actualización" value="12/09/2026 · 10:15 AM" />
+                    <Row label="Capacidad" value={selected.capacidad ? `${selected.capacidad} pasajeros` : "—"} />
+                    <Row label="Última actualización" value={selected.ultimaActualizacion ?? "—"} />
                   </dl>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-brand-500">
-                    Fotos del estado del vehículo
-                  </p>
-                  <div className="grid grid-cols-3 gap-3 sm:max-w-md">
-                    <PhotoThumb />
-                    <PhotoThumb />
-                    <PhotoThumb />
-                  </div>
-                </div>
               </div>
             )}
 
             {activeTab === "Historial" && (
               <div className="mt-6 animate-fade-in">
-                <ol className="space-y-4 border-l border-base-700 pl-5">
-                  {[
-                    { title: "Mantenimiento programado", meta: "12/09/2026 · 10:15 AM — Taller Portal Usme" },
-                    { title: "En operación", meta: "11/09/2026 · 06:32 PM — Portal Usme (H3)" },
-                    { title: "Inspección de turno", meta: "11/09/2026 · 05:48 AM — Portal Usme" },
-                    { title: "En operación", meta: "10/09/2026 · 06:22 PM — Cra. 10 / Calle 26" },
-                  ].map((event, i) => (
-                    <li key={i} className="relative">
-                      <span className="absolute -left-[25px] top-1 size-2.5 rounded-full bg-brand-500 ring-4 ring-base-900" />
-                      <p className="text-sm font-medium text-base-100">{event.title}</p>
-                      <p className="text-xs text-base-400">{event.meta}</p>
-                    </li>
-                  ))}
-                </ol>
+                <p className="py-8 text-center text-sm text-base-400">Sin eventos registrados.</p>
               </div>
             )}
 
             {activeTab === "Documentos" && (
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 animate-fade-in">
-                {["Tarjeta de operación", "SOAT vigente", "Revisión técnico-mecánica", "Póliza de responsabilidad civil"].map(
-                  (doc) => (
-                    <div
-                      key={doc}
-                      className="flex items-center justify-between rounded-lg border border-base-700 bg-base-800/50 px-4 py-3 text-sm"
-                    >
-                      <span className="text-base-200">{doc}</span>
-                      <span className="text-xs text-status-online">Vigente</span>
-                    </div>
-                  ),
-                )}
+                <p className="py-8 text-center text-sm text-base-400 sm:col-span-2">Sin documentos cargados.</p>
               </div>
             )}
           </Card>
         </motion.div>
+        )}
       </div>
     </div>
   );
