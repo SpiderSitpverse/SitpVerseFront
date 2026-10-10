@@ -15,6 +15,7 @@ import { MechanicHistoryPage } from "@/pages/MechanicHistoryPage";
 import { MechanicHomePage } from "@/pages/MechanicHomePage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { TowReportsPage } from "@/pages/TowReportsPage";
 import { UsersPage } from "@/pages/UsersPage";
 
 const DRIVER_NAV_ITEMS: NavItem[] = [
@@ -38,6 +39,7 @@ function App() {
           <Route path="buses" element={<FleetPage />} />
           <Route path="buses/registro" element={<FleetRegistryPage />} />
           <Route path="incidentes" element={<IncidentsPage />} />
+          <Route path="gruas" element={<TowReportsPage />} />
           <Route path="mantenimiento" element={<MaintenancePage />} />
           <Route path="reportes" element={<ReportsPage />} />
           <Route path="usuarios" element={<UsersPage />} />

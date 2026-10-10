@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bus as BusIcon, Check, CircleStop, Clock, Crosshair, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { DriverRoutingPanel } from "@/components/driver/DriverRoutingPanel";
 import { PreTripInspectionModal, type PreTripInspection } from "@/components/driver/PreTripInspectionModal";
 import { ReportProblemModal } from "@/components/driver/ReportProblemModal";
 import { TransMilenioMap } from "@/components/fleet/TransMilenioMap";
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useAssignedRoute } from "@/hooks/useFleetData";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
+import { useMyAssignedRoutes } from "@/hooks/useRouting";
 import { busReportClient } from "@/lib/busReportClient";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
@@ -38,6 +40,7 @@ const HOLD_MIN_METERS = 25;
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
   const activeTrips = useActiveTrips();
+  const myRoutes = useMyAssignedRoutes();
   const [reportOpen, setReportOpen] = useState(false);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -174,11 +177,15 @@ export function DriverHomePage() {
     void run(() => fleetActivityClient.endTrip(assignment.busId), "Ruta finalizada. Ya no apareces como bus activo.");
   }
 
-  async function handleReportSubmit(motivo: string, detalle: string) {
+  async function handleReportSubmit(motivo: string, detalle: string, photos: string[]) {
     if (!assignment) return;
-    await fleetActivityClient.reportIncident(assignment.busId, motivo, detalle);
+    const { failedPhotos } = await fleetActivityClient.reportIncident(assignment.busId, motivo, detalle, photos);
     setReportOpen(false);
-    setConfirmation("Reporte enviado. Administración fue notificada y decidirá cuántos conductores necesita.");
+    setConfirmation(
+      failedPhotos > 0
+        ? `Reporte enviado, pero ${failedPhotos} foto(s) no se pudieron adjuntar. Administración fue notificada.`
+        : "Reporte enviado. Administración fue notificada y decidirá cuántos conductores necesita.",
+    );
   }
 
   if (!assignment) {
@@ -213,6 +220,8 @@ export function DriverHomePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DriverRoutingPanel />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
         <Card className="lg:col-span-2">
@@ -338,7 +347,7 @@ export function DriverHomePage() {
             <CardTitle>Mapa de operaciones</CardTitle>
           </CardHeader>
           <div className="h-80 border-t border-base-700/60 sm:h-[26rem]">
-            <TransMilenioMap onPickPosition={picking ? pinPosition : undefined} />
+            <TransMilenioMap onPickPosition={picking ? pinPosition : undefined} alternativeRoutes={myRoutes} />
           </div>
         </Card>
       </div>

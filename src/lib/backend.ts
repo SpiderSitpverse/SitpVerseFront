@@ -1,10 +1,13 @@
 import { api, ApiError } from "@/lib/api";
+import { clearBlockageAlerts, recordBlockageAlert } from "@/lib/blockageAlerts";
 import { mapInspection } from "@/lib/mappers";
 import { clearNotifications, pushNotification } from "@/lib/notifications";
 import { connectRealtime, type AssistanceEvent, type FleetPositionEvent } from "@/lib/realtime";
 import { createStore } from "@/lib/store";
 import type {
+  ApiAlternativeRoute,
   ApiAssistanceSummary,
+  ApiBlockage,
   ApiBus,
   ApiCall,
   ApiFleetSummary,
@@ -27,6 +30,10 @@ export const callsStore = createStore<ApiCall[]>([]);
 export const incidentsStore = createStore<ApiIncident[]>([]);
 export const repairReportsStore = createStore<ApiRepairReport[]>([]);
 export const staffStore = createStore<ApiUser[]>([]);
+/** Incidentes con sus rutas alternativas y grúas (solo ADMIN). */
+export const blockagesStore = createStore<ApiBlockage[]>([]);
+/** Rutas alternativas asignadas al conductor que inició sesión (solo DRIVER). */
+export const assignedRoutesStore = createStore<ApiAlternativeRoute[]>([]);
 export const homeStore = createStore<ApiOperativeHome | null>(null);
 export const fleetSummaryStore = createStore<ApiFleetSummary | null>(null);
 export const assistanceSummaryStore = createStore<ApiAssistanceSummary | null>(null);
@@ -51,6 +58,7 @@ function loaders(role: ApiRole): Loader[] {
       async () => fleetSummaryStore.set(await api<ApiFleetSummary>("/fleet/summary")),
       async () => assistanceSummaryStore.set(await api<ApiAssistanceSummary>("/assistance/summary")),
       async () => incidentsStore.set(await api<ApiIncident[]>("/assistance/incidents")),
+      async () => blockagesStore.set(await api<ApiBlockage[]>("/assistance/blockages")),
       async () => staffStore.set(await api<ApiUser[]>("/users")),
     ];
   }
@@ -58,6 +66,7 @@ function loaders(role: ApiRole): Loader[] {
   return [
     buses,
     calls,
+    async () => assignedRoutesStore.set(await api<ApiAlternativeRoute[]>("/assistance/routes/assigned/me")),
     async () => {
       try {
         homeStore.set(await api<ApiOperativeHome>("/fleet/home/operativo"));
@@ -89,8 +98,12 @@ async function refreshAssistance(role: ApiRole): Promise<void> {
   if (role === "ADMIN") {
     tasks.push(
       api<ApiIncident[]>("/assistance/incidents").then((v) => incidentsStore.set(v)),
+      api<ApiBlockage[]>("/assistance/blockages").then((v) => blockagesStore.set(v)),
       api<ApiAssistanceSummary>("/assistance/summary").then((v) => assistanceSummaryStore.set(v)),
     );
+  }
+  if (role === "DRIVER") {
+    tasks.push(api<ApiAlternativeRoute[]>("/assistance/routes/assigned/me").then((v) => assignedRoutesStore.set(v)));
   }
   await Promise.allSettled(tasks);
 }
@@ -128,17 +141,67 @@ interface EventPayload {
   resent?: boolean;
   reportedById?: string;
   reportedBy?: { name?: string };
+  incidentId?: string;
+  name?: string;
 }
 
 /**
  * Aviso emergente según el rol (los eventos ya llegan filtrados por sala desde el back):
- *  - ADMIN: un conductor reportó un problema (`incident.reported`).
- *  - DRIVER / MECHANICAL: el admin abrió o reenvió una alerta con cupos (`call.opened`).
+ *  - ADMIN: un conductor reportó un problema (`incident.reported`); un conductor aceptó su ruta (`route.accepted`).
+ *  - DRIVER: el admin avisó de un bloqueo (`blockage.alerted`) o le asignó una ruta (`route.assigned`);
+ *    el admin abrió o reenvió una alerta con cupos (`call.opened`).
+ *  - MECHANICAL: el admin abrió o reenvió una solicitud de reparación (`call.opened`).
  */
 function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event: AssistanceEvent) {
-  if (Date.now() - new Date(event.occurredAt).getTime() > NOTIFY_MAX_AGE_MS) return;
   const p = event.payload as EventPayload;
   const plate = busesStore.get().find((b) => b.id === p.busId)?.plate;
+
+  // El back no guarda los avisos de bloqueo: se recuerdan siempre (aunque lleguen reenviados y viejos),
+  // y el aviso emergente solo sale si el evento es reciente.
+  if (role === "DRIVER" && event.type === "blockage.alerted" && p.incidentId) {
+    recordBlockageAlert({
+      id: event.eventId,
+      incidentId: p.incidentId,
+      busId: p.busId,
+      placa: plate,
+      tipo: p.type ?? "Bloqueo",
+      descripcion: p.description ?? "",
+      recibidaEn: event.occurredAt,
+    });
+  }
+
+  if (Date.now() - new Date(event.occurredAt).getTime() > NOTIFY_MAX_AGE_MS) return;
+
+  if (role === "DRIVER" && event.type === "blockage.alerted") {
+    pushNotification({
+      id: event.eventId,
+      title: "Bloqueo en la vía",
+      body: `${plate ? `Bus ${plate}` : "Un bus"}: ${p.type ?? "bloqueo"}`,
+      detail: p.description ?? undefined,
+      to: "/conductor",
+    });
+    return;
+  }
+
+  if (role === "DRIVER" && event.type === "route.assigned") {
+    pushNotification({
+      id: event.eventId,
+      title: "Te asignaron una ruta alternativa",
+      body: "Revísala y acéptala para tomar el desvío.",
+      to: "/conductor",
+    });
+    return;
+  }
+
+  if (role === "ADMIN" && event.type === "route.accepted") {
+    pushNotification({
+      id: event.eventId,
+      title: "Ruta alternativa aceptada",
+      body: "Un conductor aceptó el desvío que le asignaste.",
+      to: "/buses",
+    });
+    return;
+  }
 
   if (role === "ADMIN" && event.type === "incident.reported") {
     pushNotification({
@@ -217,6 +280,9 @@ export function stopSync() {
   incidentsStore.set([]);
   repairReportsStore.set([]);
   staffStore.set([]);
+  blockagesStore.set([]);
+  assignedRoutesStore.set([]);
+  clearBlockageAlerts();
   homeStore.set(null);
   fleetSummaryStore.set(null);
   assistanceSummaryStore.set(null);

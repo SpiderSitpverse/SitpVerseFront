@@ -1,4 +1,4 @@
-import { Bus, LayoutDashboard, Settings, TriangleAlert, Users, Wrench, BarChart3 } from "lucide-react";
+import { Bus, LayoutDashboard, Settings, Truck, TriangleAlert, Users, Wrench, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { NotificationToasts } from "@/components/layout/NotificationToasts";
@@ -10,6 +10,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Inicio", icon: LayoutDashboard, end: true },
   { to: "/buses", label: "Buses", icon: Bus },
   { to: "/incidentes", label: "Incidentes", icon: TriangleAlert },
+  { to: "/gruas", label: "Grúas", icon: Truck },
   { to: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
   { to: "/reportes", label: "Reportes", icon: BarChart3 },
   { to: "/usuarios", label: "Usuarios", icon: Users },

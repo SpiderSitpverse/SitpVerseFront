@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, toRelativeUrl } from "@/lib/api";
 import { busesStore, callsStore, incidentsStore, refreshAll } from "@/lib/backend";
 import type { ApiBus, ApiCall, ApiIncident } from "@/types/api";
 
@@ -23,9 +23,27 @@ export const fleetActivityClient = {
     await api(`/fleet/buses/${busId}/position`, { method: "PATCH", body: { latitude, longitude } });
   },
 
-  /** El conductor avisa a administración; el admin decide luego cuántos conductores necesita. */
-  async reportIncident(busId: string, type: string, description: string): Promise<void> {
-    await api("/assistance/incidents", { method: "POST", body: { busId, type, description: description || undefined } });
+  /**
+   * El conductor avisa a administración; el admin decide luego cuántos conductores necesita.
+   * `photos` (URLs ya subidas con `POST /files/images`) se adjuntan al incidente como evidencia (HU-22).
+   * Si alguna foto no se puede adjuntar, el reporte igual queda creado: se devuelve cuántas fallaron.
+   */
+  async reportIncident(
+    busId: string,
+    type: string,
+    description: string,
+    photos: string[] = [],
+  ): Promise<{ failedPhotos: number }> {
+    const incident = await api<{ id: string }>("/assistance/incidents", {
+      method: "POST",
+      body: { busId, type, description: description || undefined },
+    });
+    const results = await Promise.allSettled(
+      photos.map((url) =>
+        api(`/assistance/incidents/${incident.id}/evidence`, { method: "POST", body: { url: toRelativeUrl(url) } }),
+      ),
+    );
+    return { failedPhotos: results.filter((r) => r.status === "rejected").length };
   },
 
   /** El conductor acepta apoyar. 409 `FULL` si los cupos ya se llenaron. */

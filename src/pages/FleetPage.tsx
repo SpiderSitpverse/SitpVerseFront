@@ -1,15 +1,18 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { BusListRow } from "@/components/fleet/BusListRow";
 import { BusReportModal } from "@/components/fleet/BusReportModal";
 import { TransMilenioMap } from "@/components/fleet/TransMilenioMap";
 import { TroncalLegend } from "@/components/fleet/TroncalLegend";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { RoutePlanner } from "@/components/routes/RoutePlanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
-import { useBuses } from "@/hooks/useFleetData";
+import { useBuses, useIncidents } from "@/hooks/useFleetData";
+import { useAlternativeRoutes, useAssignableDrivers } from "@/hooks/useRouting";
 import type { Bus, BusStatus } from "@/types/bus";
+import type { LatLngTuple } from "@/types/routing";
 
 const FILTERS: { value: BusStatus | "todos"; label: string }[] = [
   { value: "todos", label: "Todos" },
@@ -23,6 +26,22 @@ export function FleetPage() {
   const [query, setQuery] = useState("");
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const buses = useBuses();
+
+  // HU-46/47: rutas alternativas sobre el mapa + el panel para trazarlas y asignarlas.
+  // Desde un incidente se llega con `state.incidentId` ya elegido (ver IncidentActionModal).
+  const location = useLocation();
+  const incidents = useIncidents();
+  const routes = useAlternativeRoutes();
+  const drivers = useAssignableDrivers();
+  const requestedIncident = (location.state as { incidentId?: string } | null)?.incidentId ?? "";
+  const [routeIncidentId, setRouteIncidentId] = useState(requestedIncident);
+  const [drawing, setDrawing] = useState(Boolean(requestedIncident));
+  const [draft, setDraft] = useState<LatLngTuple[]>([]);
+  const plannerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (requestedIncident) plannerRef.current?.scrollIntoView({ block: "start" });
+  }, [requestedIncident]);
 
   const counts = useMemo(
     () => ({
@@ -81,7 +100,12 @@ export function FleetPage() {
             <span className="text-xs font-medium text-brand-500">Red troncal completa</span>
           </CardHeader>
           <div className="h-80 border-t border-base-700/60 sm:h-[26rem]">
-            <TransMilenioMap onSelectBus={setSelectedBus} />
+            <TransMilenioMap
+              onSelectBus={setSelectedBus}
+              alternativeRoutes={routes}
+              draftRoute={draft}
+              onPickPosition={drawing ? (point) => setDraft((points) => (points.length >= 2000 ? points : [...points, point])) : undefined}
+            />
           </div>
           <TroncalLegend />
         </Card>
@@ -100,6 +124,20 @@ export function FleetPage() {
             ))}
           </CardContent>
         </Card>
+      </div>
+
+      <div ref={plannerRef} className="mt-5 scroll-mt-4">
+        <RoutePlanner
+          incidents={incidents}
+          routes={routes}
+          drivers={drivers}
+          incidentId={routeIncidentId}
+          onIncidentChange={setRouteIncidentId}
+          drawing={drawing}
+          onDrawingChange={setDrawing}
+          draft={draft}
+          onDraftChange={setDraft}
+        />
       </div>
 
       <BusReportModal bus={selectedBus} onClose={() => setSelectedBus(null)} />
