@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { NotificationToasts } from "@/components/layout/NotificationToasts";
 import { Sidebar, type NavItem } from "@/components/layout/Sidebar";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { Topbar } from "@/components/layout/Topbar";
 
@@ -33,7 +34,9 @@ export function AppLayout({ navItems = ADMIN_NAV_ITEMS }: { navItems?: NavItem[]
             se quedaba invisible y el módulo aparecía en negro.
           */}
           <div key={location.pathname} className="mx-auto max-w-7xl animate-fade-in-up">
-            <Outlet />
+            <ErrorBoundary resetKey={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
