@@ -14,28 +14,10 @@ import { useMyAssignedRoutes } from "@/hooks/useRouting";
 import { busReportClient } from "@/lib/busReportClient";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
-import { GpsFilter, type GpsFix } from "@/lib/gpsFilter";
-import { distanceMeters } from "@/lib/routeSnap";
+import { PositionPublisher } from "@/lib/positionPublisher";
 
-const SEND_EVERY_MS = 3000;
-/** Una lectura con este margen de error (metros) o mejor se considera "señal GPS buena". */
+/** Una lectura con este margen de error (metros) o mejor se considera "señal GPS buena" (solo para el color). */
 const GOOD_FIX_METERS = 50;
-/**
- * Al arrancar, el navegador da primero una ubicación aproximada (por red/wifi, con cientos de metros de error)
- * y solo después engancha el GPS. Esas primeras lecturas no se usan: se espera una buena.
- * La espera termina antes si la precisión deja de mejorar (un PC sin GPS nunca llegará a 50 m) y, en todo caso,
- * a los 30 s. Al terminar se arranca con la MEJOR lectura de la espera, no con la última.
- */
-const MIN_WARMUP_MS = 8_000;
-const STALL_MS = 8_000;
-const WARMUP_MS = 30_000;
-/** Punto marcado a mano en el mapa: se trata como una lectura de alta confianza que casi no se mueve sola. */
-const PINNED_ACCURACY_METERS = 5;
-const PINNED_SPEED = 0.3;
-/** Por encima de esta velocidad (m/s) el bus se considera en movimiento y el punto marcado deja de "sostenerse". */
-const MOVING_METERS_PER_SECOND = 1;
-/** Un movimiento menor que esto (o que el margen de error) estando quieto se considera ruido y no se publica. */
-const HOLD_MIN_METERS = 25;
 
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
@@ -46,14 +28,11 @@ export function DriverHomePage() {
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const lastSent = useRef(0);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [hasFix, setHasFix] = useState(false);
   const [picking, setPicking] = useState(false);
-  const filterRef = useRef<GpsFilter>(new GpsFilter());
-  const acceptedRef = useRef(false);
-  const pinnedRef = useRef(false);
-  const lastPublishedRef = useRef<[number, number] | null>(null);
+  // Decide qué posición se publica y cuándo (espera inicial, filtro, quieto/en movimiento): ver lib/positionPublisher.ts.
+  const publisherRef = useRef(new PositionPublisher());
 
   const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
@@ -65,49 +44,18 @@ export function DriverHomePage() {
   const busId = assignment?.busId;
   useEffect(() => {
     if (!started || !busId || !("geolocation" in navigator)) return;
-    filterRef.current = new GpsFilter();
-    acceptedRef.current = false;
-    pinnedRef.current = false;
-    lastPublishedRef.current = null;
-    const openedAt = Date.now();
-    let best: GpsFix | null = null;
-    let bestAt = openedAt;
+    const publisher = publisherRef.current;
+    publisher.reset(Date.now());
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy: meters, speed } = pos.coords;
-        const now = Date.now();
-        setAccuracy(Math.round(meters));
-        let fix: GpsFix = { lat: latitude, lng: longitude, accuracy: meters, timestamp: pos.timestamp, speed };
-
-        if (!acceptedRef.current) {
-          // Arranque en frío: sin una lectura buena todavía, ni se usa ni se muestra (así el bus no "baila" entre calles).
-          if (!best || meters < best.accuracy) {
-            best = fix;
-            bestAt = now;
-          }
-          const good = meters <= GOOD_FIX_METERS;
-          const stalled = now - openedAt >= MIN_WARMUP_MS && now - bestAt >= STALL_MS;
-          if (!good && !stalled && now - openedAt < WARMUP_MS) return;
-          acceptedRef.current = true;
-          if (!good) fix = best; // se arranca con la mejor lectura de la espera
-        }
-
-        // Con el punto marcado a mano, las lecturas imprecisas y sin movimiento (típico de un PC sin GPS) NO lo
-        // arrastran de vuelta a la ubicación errada del navegador. Un GPS bueno de verdad lo libera: vuelve al seguimiento normal.
-        if (pinnedRef.current && meters <= GOOD_FIX_METERS) pinnedRef.current = false;
-        const holdPin = pinnedRef.current && (speed ?? 0) < MOVING_METERS_PER_SECOND;
-        // Filtro de Kalman: pesa cada lectura según su margen de error, así el punto sigue al bus sin saltos.
-        const fixed = (holdPin ? filterRef.current.estimate : null) ?? filterRef.current.update(fix);
-        setHasFix(true);
-        // Quieto (sin velocidad real) y la posición nueva cae dentro del margen de error de la última publicada:
-        // es ruido del GPS, no movimiento. No se publica, así el bus no "camina" estando parado.
-        const last = lastPublishedRef.current;
-        const moving = (speed ?? 0) >= MOVING_METERS_PER_SECOND;
-        if (last && !moving && distanceMeters(last, [fixed.lat, fixed.lng]) < Math.max(HOLD_MIN_METERS, fixed.accuracy)) return;
-        if (now - lastSent.current < SEND_EVERY_MS) return;
-        lastSent.current = now;
-        lastPublishedRef.current = [fixed.lat, fixed.lng];
-        fleetActivityClient.sendPosition(busId, fixed.lat, fixed.lng).catch(() => undefined);
+        const update = publisher.push(
+          { lat: latitude, lng: longitude, accuracy: meters, timestamp: pos.timestamp, speed },
+          Date.now(),
+        );
+        setAccuracy(Math.round(update.accuracy));
+        if (update.state !== "searching") setHasFix(true);
+        if (update.publish) fleetActivityClient.sendPosition(busId, update.publish[0], update.publish[1]).catch(() => undefined);
       },
       (err) =>
         setError(
@@ -129,13 +77,7 @@ export function DriverHomePage() {
   /** El conductor marca en el mapa dónde está el bus: se envía de inmediato y el GPS impreciso ya no lo desplaza. */
   function pinPosition([lat, lng]: [number, number]) {
     if (!busId) return;
-    const pinned = new GpsFilter(PINNED_SPEED);
-    pinned.update({ lat, lng, accuracy: PINNED_ACCURACY_METERS, timestamp: Date.now() });
-    filterRef.current = pinned;
-    acceptedRef.current = true;
-    pinnedRef.current = true;
-    lastPublishedRef.current = [lat, lng];
-    lastSent.current = Date.now();
+    publisherRef.current.pin([lat, lng], Date.now());
     setHasFix(true);
     setPicking(false);
     fleetActivityClient

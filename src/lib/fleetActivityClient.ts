@@ -1,5 +1,6 @@
 import { api, toRelativeUrl } from "@/lib/api";
 import { busesStore, callsStore, incidentsStore, refreshAll } from "@/lib/backend";
+import { dismissWhere } from "@/lib/notifications";
 import type { ApiBus, ApiCall, ApiIncident } from "@/types/api";
 
 /**
@@ -49,6 +50,7 @@ export const fleetActivityClient = {
   /** El conductor acepta apoyar. 409 `FULL` si los cupos ya se llenaron. */
   async acceptHelpRequest(callId: string): Promise<void> {
     await api(`/assistance/calls/${callId}/accept`, { method: "POST" });
+    dismissWhere((n) => n.callId === callId); // ya la tomaste: su aviso emergente sobra
     await refreshCalls();
   },
 

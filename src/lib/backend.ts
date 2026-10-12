@@ -1,7 +1,7 @@
 import { api, ApiError } from "@/lib/api";
 import { clearBlockageAlerts, recordBlockageAlert } from "@/lib/blockageAlerts";
 import { mapInspection } from "@/lib/mappers";
-import { clearNotifications, pushNotification } from "@/lib/notifications";
+import { clearNotifications, dismissWhere, pushNotification } from "@/lib/notifications";
 import { connectRealtime, type AssistanceEvent, type FleetPositionEvent } from "@/lib/realtime";
 import { createStore } from "@/lib/store";
 import type {
@@ -142,6 +142,7 @@ interface EventPayload {
   reportedById?: string;
   reportedBy?: { name?: string };
   incidentId?: string;
+  callId?: string;
   name?: string;
 }
 
@@ -155,6 +156,15 @@ interface EventPayload {
 function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event: AssistanceEvent) {
   const p = event.payload as EventPayload;
   const plate = busesStore.get().find((b) => b.id === p.busId)?.plate;
+
+  // "Se quita": una alerta que ya se llenó o terminó, o un incidente eliminado, deja sin sentido sus avisos
+  // pendientes (aunque el evento sea viejo: quitar un aviso que ya no está no cuesta nada).
+  if ((event.type === "call.closed" || event.type === "call.completed") && p.callId) {
+    dismissWhere((n) => n.callId === p.callId);
+  }
+  if (event.type === "incident.deleted" && p.incidentId) {
+    dismissWhere((n) => n.incidentId === p.incidentId);
+  }
 
   // El back no guarda los avisos de bloqueo: se recuerdan siempre (aunque lleguen reenviados y viejos),
   // y el aviso emergente solo sale si el evento es reciente.
@@ -210,6 +220,7 @@ function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event:
       body: `${p.reportedBy?.name ?? "Un conductor"}${plate ? ` · ${plate}` : ""}: ${p.type ?? "problema"}`,
       detail: p.description ?? undefined,
       to: "/incidentes",
+      incidentId: p.incidentId,
     });
     return;
   }
@@ -224,6 +235,8 @@ function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event:
       body: `${plate ? `Bus ${plate}` : "Un bus"}: ${p.description ?? "requiere asistencia"}`,
       detail: callDetail(p),
       to: "/conductor/ayuda",
+      callId: p.callId,
+      incidentId: p.incidentId,
     });
   } else if (role === "MECHANICAL") {
     pushNotification({
@@ -232,6 +245,8 @@ function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event:
       body: `${plate ? `Bus ${plate}` : "Un bus"}: ${p.description ?? "requiere reparación"}`,
       detail: callDetail(p),
       to: "/taller",
+      callId: p.callId,
+      incidentId: p.incidentId,
     });
   }
 }

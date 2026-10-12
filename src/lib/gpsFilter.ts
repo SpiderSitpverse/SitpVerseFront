@@ -29,7 +29,8 @@ export class GpsFilter {
   private lng = 0;
   private variance = -1; // m²; negativo = aún sin lecturas
   private timestamp = 0;
-  private readonly speedMetersPerSecond: number;
+  /** Movimiento esperado entre lecturas (m/s). Se puede subir mientras el vehículo se mueve para no quedarse atrás. */
+  speedMetersPerSecond: number;
 
   /**
    * @param speedMetersPerSecond cuánto puede moverse el vehículo entre lecturas (la incertidumbre crece con el

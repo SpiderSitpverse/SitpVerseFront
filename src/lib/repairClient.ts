@@ -1,5 +1,6 @@
 import { api, toRelativeUrl } from "@/lib/api";
 import { callsStore, refreshAll, repairReportsStore } from "@/lib/backend";
+import { dismissWhere } from "@/lib/notifications";
 import { mapRepairReport } from "@/lib/mappers";
 import type { ApiRepairReport } from "@/types/api";
 import type { RepairReport } from "@/types/repair";
@@ -24,6 +25,7 @@ export const repairClient = {
   /** El primero en aceptar se queda con la reparación; los demás reciben 409. */
   async acceptRequest(callId: string): Promise<void> {
     await api(`/assistance/calls/${callId}/accept`, { method: "POST" });
+    dismissWhere((n) => n.callId === callId); // ya la tomaste: su aviso emergente sobra
     await refreshAll();
   },
 
