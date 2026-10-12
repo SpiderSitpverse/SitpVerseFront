@@ -1,5 +1,6 @@
 import { toAbsoluteUrl } from "@/lib/api";
 import type {
+  ApiAlternativeRoute,
   ApiBus,
   ApiCall,
   ApiIncident,
@@ -7,11 +8,13 @@ import type {
   ApiOperativeHome,
   ApiRepairReport,
   ApiRole,
+  ApiTowAssignment,
   ApiUser,
 } from "@/types/api";
 import type { Bus, BusReport, Incident } from "@/types/bus";
 import type { ActiveTrip, AssignedRoute, HelpRequest, Role } from "@/types/driver";
 import type { RepairReport, RepairRequest } from "@/types/repair";
+import type { AlternativeRoute, LatLngTuple, RouteState, TowAssignment, TowState } from "@/types/routing";
 import type { StaffMember } from "@/types/user";
 
 /** Traducciones entre el contrato del back y los tipos del front (tabla en docs/API.md §3). */
@@ -157,6 +160,70 @@ export function mapInspection(inspection: ApiInspection): BusReport {
     nota: inspection.note,
     comentario: inspection.comment || inspection.note,
     fotos: (inspection.photos ?? []).map(toAbsoluteUrl),
+  };
+}
+
+/**
+ * El trazado llega como JSON suelto: se queda solo con los pares `[lat, lng]` numéricos y en rango.
+ * Un punto mal formado dibujaría la polilínea de Leaflet en cualquier lado o la rompería.
+ */
+export function sanitizeGeometry(raw: unknown): LatLngTuple[] {
+  if (!Array.isArray(raw)) return [];
+  const points: LatLngTuple[] = [];
+  for (const point of raw) {
+    if (!Array.isArray(point) || point.length !== 2) continue;
+    const [lat, lng] = point;
+    if (typeof lat !== "number" || typeof lng !== "number") continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+    points.push([lat, lng]);
+  }
+  return points;
+}
+
+const ROUTE_STATE: Record<ApiAlternativeRoute["status"], RouteState> = {
+  PROPOSED: "propuesta",
+  ASSIGNED: "asignada",
+  ACCEPTED: "aceptada",
+};
+
+/** `incident` y `plateOf` enriquecen la ruta con el incidente al que pertenece. */
+export function mapAlternativeRoute(
+  route: ApiAlternativeRoute,
+  incident?: Pick<ApiIncident, "type" | "description" | "busId">,
+  plateOf?: (busId: string) => string,
+): AlternativeRoute {
+  return {
+    id: route.id,
+    incidentId: route.incidentId,
+    nombre: route.name,
+    estado: ROUTE_STATE[route.status] ?? "propuesta",
+    puntos: sanitizeGeometry(route.geometry),
+    conductorId: route.assignedToId ?? undefined,
+    creadaEn: route.createdAt,
+    incidente: incident
+      ? { titulo: incident.type, descripcion: incident.description ?? "", placa: plateOf?.(incident.busId) }
+      : undefined,
+  };
+}
+
+const TOW_STATE: Record<ApiTowAssignment["status"], TowState> = {
+  ASSIGNED: "asignada",
+  IN_PROGRESS: "en-curso",
+  COMPLETED: "completada",
+};
+
+export function mapTowAssignment(tow: ApiTowAssignment, plateOf?: (busId: string) => string): TowAssignment {
+  return {
+    id: tow.id,
+    incidentId: tow.incidentId,
+    busId: tow.busId,
+    placa: plateOf?.(tow.busId),
+    grua: tow.towTruck,
+    cuadrilla: tow.crew,
+    estado: TOW_STATE[tow.status] ?? "asignada",
+    creadoEn: tow.createdAt,
+    completadoEn: tow.completedAt ?? undefined,
+    incidente: tow.incident ? { titulo: tow.incident.type, descripcion: tow.incident.description ?? "" } : undefined,
   };
 }
 

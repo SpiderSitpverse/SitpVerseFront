@@ -1,9 +1,14 @@
-import { Check, Radio, Send, Trash2, Wrench } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Check, Radio, Send, Siren, Trash2, Wrench } from "lucide-react";
+import { useState } from "react";
+import { ActionRow } from "@/components/incidents/ActionRow";
+import { EvidenceSection } from "@/components/incidents/EvidenceSection";
+import { RoutesSection } from "@/components/incidents/RoutesSection";
+import { TowSection } from "@/components/incidents/TowSection";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { ApiError } from "@/lib/api";
 import { fleetActivityClient } from "@/lib/fleetActivityClient";
+import { routingClient } from "@/lib/routingClient";
 import { SEVERITY_STYLE } from "@/lib/status";
 import { timeAgo } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -13,32 +18,6 @@ const STATE_LABEL: Record<IncidentState, string> = {
   reportado: "Por gestionar",
   "ayuda-solicitada": "Ayuda solicitada",
 };
-
-interface ActionRowProps {
-  icon: typeof Wrench;
-  title: string;
-  description: string;
-  children: ReactNode;
-}
-
-function ActionRow({ icon: Icon, title, description, children }: ActionRowProps) {
-  return (
-    <div className="rounded-xl border border-base-700 bg-base-800/40 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-base-800 text-base-300">
-            <Icon className="size-4" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-base-100">{title}</p>
-            <p className="text-xs text-base-400">{description}</p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function SendButton({ sent, onClick, idleLabel, sentLabel }: { sent: boolean; onClick: () => void; idleLabel: string; sentLabel: string }) {
   return (
@@ -65,6 +44,7 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
   const [reward, setReward] = useState(10);
   const [alertSent, setAlertSent] = useState(alreadyRequested);
   const [teamSent, setTeamSent] = useState(false);
+  const [fleetAlerted, setFleetAlerted] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +119,30 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
             </label>
           </div>
         )}
+
+        <ActionRow
+          icon={Siren}
+          title="Avisar bloqueo a la flota"
+          description="Envía una alerta inmediata a todos los conductores. Solo informa: no pide apoyo."
+        >
+          <SendButton
+            sent={fleetAlerted}
+            onClick={() =>
+              run(
+                () => routingClient.alertFleet(incident.id),
+                () => setFleetAlerted(true),
+              )
+            }
+            idleLabel="Avisar"
+            sentLabel="Avisado"
+          />
+        </ActionRow>
+
+        <RoutesSection incident={incident} onClose={onClose} />
+
+        <TowSection incidentId={incident.id} run={run} />
+
+        <EvidenceSection incidentId={incident.id} run={run} />
 
         <ActionRow
           icon={Wrench}

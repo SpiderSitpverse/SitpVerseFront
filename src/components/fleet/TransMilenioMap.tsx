@@ -8,8 +8,13 @@ import { useBuses } from "@/hooks/useFleetData";
 import { useSmoothPosition } from "@/hooks/useSmoothPosition";
 import type { Bus } from "@/types/bus";
 import type { ActiveTrip } from "@/types/driver";
+import type { AlternativeRoute, LatLngTuple, RouteState } from "@/types/routing";
 
 const LIVE_TRIP_COLOR = "#3b82f6";
+
+/** Color de cada ruta alternativa según su estado: ámbar = propuesta, azul = asignada, verde = aceptada. */
+const ROUTE_COLOR: Record<RouteState, string> = { propuesta: "#f59e0b", asignada: "#38bdf8", aceptada: "#22c55e" };
+const ROUTE_LABEL: Record<RouteState, string> = { propuesta: "Propuesta", asignada: "Asignada", aceptada: "Aceptada" };
 
 const STATION_ZOOM_THRESHOLD = 15;
 
@@ -132,6 +137,76 @@ function LiveBusMarker({ trip, icon, onOpenReport }: { trip: ActiveTrip; icon: L
   );
 }
 
+/**
+ * HU-46: rutas alternativas dibujadas sobre el mapa (línea discontinua; círculo vacío = salida, lleno = llegada),
+ * más el trazado en borrador mientras el administrador lo dibuja (HU-47).
+ */
+function AlternativeRouteLayers({
+  routes,
+  draft,
+  interactive,
+}: {
+  routes: AlternativeRoute[];
+  draft: LatLngTuple[];
+  interactive: boolean;
+}) {
+  return (
+    <>
+      {routes
+        .filter((route) => route.puntos.length >= 2)
+        .map((route) => {
+          const color = ROUTE_COLOR[route.estado];
+          return (
+            <Fragment key={route.id}>
+              <Polyline
+                positions={route.puntos}
+                pathOptions={{ color, weight: 6, opacity: 0.95, dashArray: "10 8", interactive }}
+              >
+                <Popup>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color }}>
+                    Ruta alternativa · {ROUTE_LABEL[route.estado]}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-base-950">{route.nombre}</p>
+                  {route.incidente && (
+                    <p className="text-xs text-base-600">
+                      {route.incidente.placa ? `${route.incidente.placa} · ` : ""}
+                      {route.incidente.titulo}
+                    </p>
+                  )}
+                </Popup>
+              </Polyline>
+              <CircleMarker
+                center={route.puntos[0]}
+                radius={6}
+                pathOptions={{ color, weight: 3, fillColor: "#f7f7f9", fillOpacity: 1, interactive: false }}
+              />
+              <CircleMarker
+                center={route.puntos[route.puntos.length - 1]}
+                radius={6}
+                pathOptions={{ color, weight: 3, fillColor: color, fillOpacity: 1, interactive: false }}
+              />
+            </Fragment>
+          );
+        })}
+
+      {draft.length >= 2 && (
+        <Polyline
+          positions={draft}
+          pathOptions={{ color: "#f7f7f9", weight: 4, opacity: 0.9, dashArray: "4 8", interactive: false }}
+        />
+      )}
+      {draft.map((point, index) => (
+        <CircleMarker
+          key={`${index}-${point[0]}-${point[1]}`}
+          center={point}
+          radius={index === draft.length - 1 ? 6 : 4}
+          pathOptions={{ color: "#f7f7f9", weight: 2, fillColor: "#ef4444", fillOpacity: 1, interactive: false }}
+        />
+      ))}
+    </>
+  );
+}
+
 /** Modo "marcar punto": un clic en el mapa entrega las coordenadas y el cursor pasa a ser una mira. */
 function PickPosition({ onPick }: { onPick: (point: [number, number]) => void }) {
   const map = useMap();
@@ -149,10 +224,16 @@ function PickPosition({ onPick }: { onPick: (point: [number, number]) => void })
 export function TransMilenioMap({
   onSelectBus,
   onPickPosition,
+  alternativeRoutes = [],
+  draftRoute = [],
 }: {
   onSelectBus?: (bus: Bus) => void;
   /** Si se pasa, el mapa entra en modo "marcar punto" (el clic ya no abre popups). */
   onPickPosition?: (point: [number, number]) => void;
+  /** Rutas alternativas a dibujar (el administrador ve todas; el conductor, las suyas). */
+  alternativeRoutes?: AlternativeRoute[];
+  /** Trazado a medio dibujar: puntos ya marcados, aún sin guardar. */
+  draftRoute?: LatLngTuple[];
 }) {
   return (
     <MapContainer center={BOGOTA_CENTER} zoom={12} scrollWheelZoom className="size-full">
@@ -170,6 +251,7 @@ export function TransMilenioMap({
       {onPickPosition && <PickPosition onPick={onPickPosition} />}
 
       <RouteLayers onSelectBus={onSelectBus} />
+      <AlternativeRouteLayers routes={alternativeRoutes} draft={draftRoute} interactive={!onPickPosition} />
     </MapContainer>
   );
 }

@@ -1,6 +1,7 @@
 import { Send, TriangleAlert } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { PhotoUploadField } from "@/components/ui/PhotoUploadField";
 
 const MOTIVOS = [
   "Falla mecánica",
@@ -13,12 +14,13 @@ const MOTIVOS = [
 interface ReportProblemModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (motivo: string, detalle: string) => Promise<void>;
+  onSubmit: (motivo: string, detalle: string, photos: string[]) => Promise<void>;
 }
 
 export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemModalProps) {
   const [motivo, setMotivo] = useState(MOTIVOS[0]);
   const [detalle, setDetalle] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -27,9 +29,10 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
     setError(null);
     setSending(true);
     try {
-      await onSubmit(motivo, detalle.trim());
+      await onSubmit(motivo, detalle.trim(), photos);
       setMotivo(MOTIVOS[0]);
       setDetalle("");
+      setPhotos([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo enviar el reporte.");
     } finally {
@@ -76,6 +79,8 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
               className="w-full resize-none rounded-lg border border-base-700 bg-base-900 px-3.5 py-2.5 text-sm text-base-100 placeholder:text-base-500 outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/15"
             />
           </div>
+
+          <PhotoUploadField label="Fotos del problema (opcional)" photos={photos} onChange={setPhotos} max={4} />
 
           {error && (
             <p className="rounded-lg bg-status-danger/10 px-3 py-2 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">

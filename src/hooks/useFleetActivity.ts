@@ -11,7 +11,14 @@ export function useActiveTrips(): ActiveTrip[] {
   return useMemo(() => buses.filter((b) => b.status === "IN_SERVICE").map(mapActiveTrip), [buses]);
 }
 
-/** Alertas de apoyo entre conductores (`kind: DRIVER_SUPPORT`) que sigan abiertas o en curso. */
+/**
+ * Alertas de apoyo entre conductores (`kind: DRIVER_SUPPORT`) que le importan a ESTE conductor:
+ *  - las abiertas (todavía puede ayudar);
+ *  - las que él tomó;
+ *  - las de su propio bus (para saber que le llegó ayuda).
+ * Una alerta que otro conductor ya tomó (cupos llenos) o que ya terminó "se quita" de su lista. El back ya manda
+ * solo esas; el filtro de aquí hace que desaparezca al instante, sin esperar al siguiente refresco.
+ */
 export function useHelpRequests(): HelpRequest[] {
   const calls = useStore(callsStore);
   const home = useStore(homeStore);
@@ -21,6 +28,12 @@ export function useHelpRequests(): HelpRequest[] {
     const me = { id: userId, nombre: nombre ?? "Tú", busId: home?.busId };
     return calls
       .filter((c) => c.kind === "DRIVER_SUPPORT" && c.status !== "COMPLETED")
+      .filter(
+        (c) =>
+          c.status === "OPEN" ||
+          c.busId === me.busId ||
+          c.claims.some((claim) => claim.userId === userId && claim.status === "ACTIVE"),
+      )
       .map((c) => mapHelpRequest(c, me));
   }, [calls, home, userId, nombre]);
 }

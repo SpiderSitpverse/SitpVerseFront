@@ -133,3 +133,52 @@ export interface ApiInspection {
   photos: string[];
   createdAt: string;
 }
+
+/** Ruta alternativa de un bloqueo (`GET /assistance/blockages`, `…/routes/assigned/me`). */
+export interface ApiAlternativeRoute {
+  id: string;
+  incidentId: string;
+  name: string;
+  /** Lista de `[latitud, longitud]`. Llega como JSON: se sanea en el mapper antes de dibujarla. */
+  geometry: unknown;
+  status: "PROPOSED" | "ASSIGNED" | "ACCEPTED";
+  assignedToId: string | null;
+  assignedAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  /** Solo viene en `GET /assistance/routes/assigned/me`. */
+  incident?: ApiIncident;
+}
+
+/** Grúa y cuadrilla asignadas a un incidente. */
+export interface ApiTowAssignment {
+  id: string;
+  incidentId: string;
+  busId: string;
+  towTruck: string;
+  crew: string;
+  status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED";
+  assignedById: string;
+  createdAt: string;
+  completedAt: string | null;
+  /** Solo viene en `GET /assistance/tow-reports`. */
+  incident?: { id: string; busId: string; type: string; description: string | null; createdAt: string };
+}
+
+/** Un incidente con sus rutas alternativas y grúas (`GET /assistance/blockages`). */
+export interface ApiBlockage extends ApiIncident {
+  blockageStatus: "OPEN" | "RESOLVED";
+  alternativeRoutes: ApiAlternativeRoute[];
+  towAssignments: ApiTowAssignment[];
+}
+
+export interface ApiEvidence {
+  id: string;
+  incidentId: string;
+  /** URL relativa (`/uploads/…`). */
+  url: string;
+  caption: string | null;
+  capturedAt: string | null;
+  uploadedById: string;
+  createdAt: string;
+}
