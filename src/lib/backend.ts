@@ -1,5 +1,5 @@
 import { api, ApiError } from "@/lib/api";
-import { clearBlockageAlerts, recordBlockageAlert } from "@/lib/blockageAlerts";
+import { clearBlockageAlerts, dismissBlockageAlertsFor, recordBlockageAlert } from "@/lib/blockageAlerts";
 import { mapInspection } from "@/lib/mappers";
 import { clearNotifications, dismissWhere, pushNotification } from "@/lib/notifications";
 import { connectRealtime, type AssistanceEvent, type FleetPositionEvent } from "@/lib/realtime";
@@ -143,6 +143,11 @@ interface EventPayload {
   reportedBy?: { name?: string };
   incidentId?: string;
   callId?: string;
+  userId?: string;
+  /** `incident.deleted`: a quién se le canceló su aceptación o su desvío. */
+  affectedUserIds?: string[];
+  /** `call.completed`: quiénes cobraron los puntos. */
+  awardedUserIds?: string[];
   name?: string;
 }
 
@@ -162,8 +167,9 @@ function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event:
   if ((event.type === "call.closed" || event.type === "call.completed") && p.callId) {
     dismissWhere((n) => n.callId === p.callId);
   }
-  if (event.type === "incident.deleted" && p.incidentId) {
+  if ((event.type === "incident.deleted" || event.type === "incident.resolved") && p.incidentId) {
     dismissWhere((n) => n.incidentId === p.incidentId);
+    dismissBlockageAlertsFor(p.incidentId);
   }
 
   // El back no guarda los avisos de bloqueo: se recuerdan siempre (aunque lleguen reenviados y viejos),
@@ -181,6 +187,36 @@ function notifyAssistanceEvent(role: ApiRole, userId: string | undefined, event:
   }
 
   if (Date.now() - new Date(event.occurredAt).getTime() > NOTIFY_MAX_AGE_MS) return;
+
+  // Tiempo real para quien ayuda (conductor o mecánico): se entera al instante si su trabajo se cae o si cobró,
+  // sin tener que mirar la lista.
+  if (userId && (role === "DRIVER" || role === "MECHANICAL")) {
+    if (event.type === "incident.deleted" && p.affectedUserIds?.includes(userId)) {
+      pushNotification({
+        id: event.eventId,
+        title: "Ayuda cancelada",
+        body: "El administrador eliminó el incidente que ibas a atender. Ya no tienes que ir.",
+      });
+      return;
+    }
+    if (event.type === "claim.cancelled" && p.userId === userId) {
+      pushNotification({
+        id: event.eventId,
+        title: "Aceptación cancelada",
+        body: "El administrador canceló tu aceptación: la alerta vuelve a quedar disponible para otro.",
+      });
+      return;
+    }
+    if (event.type === "call.completed" && p.awardedUserIds?.includes(userId)) {
+      pushNotification({
+        id: event.eventId,
+        title: "Atención confirmada",
+        body: p.rewardPoints ? `Ganaste ${p.rewardPoints} puntos por ayudar.` : "Tu ayuda quedó registrada.",
+        callId: p.callId,
+      });
+      return;
+    }
+  }
 
   if (role === "DRIVER" && event.type === "blockage.alerted") {
     pushNotification({

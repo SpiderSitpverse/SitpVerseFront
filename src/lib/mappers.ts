@@ -1,4 +1,5 @@
 import { toAbsoluteUrl } from "@/lib/api";
+import { describePosition } from "@/lib/place";
 import type {
   ApiAlternativeRoute,
   ApiBus,
@@ -40,11 +41,19 @@ function num(value: number | string | null | undefined): number | undefined {
 /** `mantenimiento` = el bus tiene una alerta de reparación abierta o en curso (OPEN/FILLED). */
 export function mapBus(bus: ApiBus, repairBusIds: Set<string>): Bus {
   const estado = bus.status === "IN_SERVICE" ? "operacion" : repairBusIds.has(bus.id) ? "mantenimiento" : "fuera-servicio";
+  const lat = num(bus.latitude);
+  const lng = num(bus.longitude);
+  // Un bus que salió de su patio (en servicio o ya finalizado) se describe por su posición real; la etiqueta fija
+  // de la ficha solo vale mientras está en reposo.
+  const moved = bus.status !== "IDLE" && lat !== undefined && lng !== undefined;
+  const ubicacion = moved
+    ? describePosition(lat, lng)
+    : (bus.locationLabel ?? (lat !== undefined && lng !== undefined ? describePosition(lat, lng) : "Sin ubicación"));
   return {
     id: bus.id,
     placa: bus.plate,
     troncal: bus.route,
-    ubicacion: bus.locationLabel ?? "Sin ubicación",
+    ubicacion,
     estado,
     modelo: bus.model ?? undefined,
     anio: bus.year ?? undefined,
@@ -52,8 +61,8 @@ export function mapBus(bus: ApiBus, repairBusIds: Set<string>): Bus {
     capacidad: bus.capacity ?? undefined,
     foto: bus.photoUrl ? toAbsoluteUrl(bus.photoUrl) : undefined,
     ultimaActualizacion: formatDateTime(bus.updatedAt),
-    lat: num(bus.latitude),
-    lng: num(bus.longitude),
+    lat,
+    lng,
   };
 }
 
