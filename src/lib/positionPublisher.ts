@@ -70,6 +70,16 @@ const EXIT_CONFIRM_MS = 60_000;
 /** Dos salidas cuentan como "el mismo lado" si sus rumbos difieren menos que esto. */
 const SAME_DIRECTION_DEG = 60;
 
+/** Una lectura con este margen de error (m) o mejor cuenta como "posición aprovechable". */
+const USABLE_FIX_METERS = 150;
+/** Después de una posición aprovechable, las lecturas con más margen que esto se ignoran (p. ej. ubicación por IP). */
+const REJECT_ABOVE_METERS = 500;
+/** Velocidad máxima creíble de un bus (m/s, ~144 km/h) y distancia mínima para sospechar de un salto. */
+const MAX_BUS_SPEED = 40;
+const JUMP_MIN_METERS = 400;
+/** Lecturas seguidas con un salto imposible para aceptarlo como reubicación real (≈ 18 s a una lectura cada 3 s). */
+const TELEPORT_CONFIRM_READINGS = 6;
+
 /** Rumbo en grados (0 = norte, 90 = este) de `from` a `to`, en un plano local. */
 function bearing(from: LatLng, to: LatLng): number {
   const dN = (to[0] - from[0]) * 110_540;
@@ -100,6 +110,9 @@ export class PositionPublisher {
   private movingUntil = -Infinity;
   private lastExit: { at: number; heading: number } | null = null;
   private baseSpeed = STILL_PROCESS_SPEED;
+  private usableFix = false; // ya hubo al menos una lectura de precisión aprovechable
+  private teleports = 0; // lecturas seguidas con un salto imposible
+  private lastReadingAt = 0;
 
   constructor(options: Partial<PublisherOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -121,6 +134,9 @@ export class PositionPublisher {
     this.movingUntil = -Infinity;
     this.lastExit = null;
     this.baseSpeed = STILL_PROCESS_SPEED;
+    this.usableFix = false;
+    this.teleports = 0;
+    this.lastReadingAt = 0;
   }
 
   /** El conductor marca a mano dónde está: se publica ya y el GPS impreciso no lo arrastra de vuelta. */
@@ -155,6 +171,32 @@ export class PositionPublisher {
       this.accepted = true;
       if (!good) fix = this.best;
     }
+
+    // 1b. Lecturas que no sirven, una vez que ya hubo una posición aprovechable:
+    //  (a) precisión pésima: típico de un navegador de escritorio que de pronto cae a la ubicación por IP (a decenas de
+    //      km, con miles de metros de margen). No dice dónde está el bus: se ignora.
+    //  (b) un salto físicamente imposible (un bus no recorre 20 km en 2 s): puede ser un fallo del proveedor. Se
+    //      ignora hasta que se repita varias lecturas seguidas; entonces se acepta como una reubicación real.
+    if (this.usableFix) {
+      if (accuracy > REJECT_ABOVE_METERS) return { state: this.holdState(now), publish: null, accuracy };
+      if (this.estimate) {
+        const seconds = Math.max(1, (reading.timestamp - this.lastReadingAt) / 1000);
+        const limit = Math.max(JUMP_MIN_METERS, MAX_BUS_SPEED * seconds + 3 * accuracy);
+        if (distanceMeters(this.estimate, [fix.lat, fix.lng]) > limit) {
+          this.teleports += 1;
+          if (this.teleports < TELEPORT_CONFIRM_READINGS) {
+            this.lastReadingAt = reading.timestamp;
+            return { state: this.holdState(now), publish: null, accuracy };
+          }
+          this.relocate();
+        } else {
+          this.teleports = 0;
+        }
+      }
+    } else if (accuracy <= USABLE_FIX_METERS) {
+      this.usableFix = true;
+    }
+    this.lastReadingAt = reading.timestamp;
 
     // 2. Un punto marcado a mano se sostiene frente a lecturas imprecisas y sin movimiento; un GPS bueno lo libera.
     if (this.pinned && accuracy <= o.goodFixMeters) this.pinned = false;
@@ -197,6 +239,22 @@ export class PositionPublisher {
       return this.send(here, now, accuracy, "moving");
     }
     return { state: inMotion ? "moving" : "still", publish: null, accuracy };
+  }
+
+  private holdState(now: number): MotionState {
+    return now < this.movingUntil ? "moving" : "still";
+  }
+
+  /** El dispositivo se "mudó" de verdad (saltos imposibles repetidos): se reinicia el seguimiento en el sitio nuevo. */
+  private relocate() {
+    this.filter = new GpsFilter(this.baseSpeed);
+    this.anchor = null;
+    this.estimate = null;
+    this.lastSentAt = -Infinity;
+    this.noiseEma = null;
+    this.teleports = 0;
+    this.movingUntil = -Infinity;
+    this.lastExit = null;
   }
 
   /**
