@@ -104,7 +104,7 @@ export interface ApiIncident {
   reportedByName: string | null;
   type: string;
   description: string | null;
-  status: "REPORTED" | "HELP_REQUESTED";
+  status: "REPORTED" | "HELP_REQUESTED" | "RESOLVED";
   createdAt: string;
 }
 

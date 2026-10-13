@@ -60,9 +60,21 @@ export const fleetActivityClient = {
     await refreshAll();
   },
 
-  /** Admin: elimina un incidente que nadie atendió. 409 si ya tiene aceptaciones o está terminado. */
-  async deleteIncident(incidentId: string): Promise<void> {
-    await api(`/assistance/incidents/${incidentId}`, { method: "DELETE" });
+  /**
+   * Admin: elimina un incidente. 409 con `reason`: `CLAIMED` (alguien lo atiende: con `force` se elimina igual y se
+   * cancelan sus aceptaciones sin puntos), `TOW_ACTIVE` (grúa en servicio) o `ROUTE_ACTIVE` (ruta asignada).
+   */
+  async deleteIncident(incidentId: string, force = false): Promise<void> {
+    await api(`/assistance/incidents/${incidentId}${force ? "?force=true" : ""}`, { method: "DELETE" });
+    await refreshAll();
+  },
+
+  /**
+   * "Atención recibida": el conductor que reportó el incidente confirma que ya le llegó la ayuda. Cierra la alerta,
+   * paga los puntos a quienes ayudaron y el incidente queda resuelto.
+   */
+  async confirmHelpReceived(callId: string): Promise<void> {
+    await api(`/assistance/calls/${callId}/complete`, { method: "POST" });
     await refreshAll();
   },
 

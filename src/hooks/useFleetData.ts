@@ -23,7 +23,8 @@ export function useBuses(): Bus[] {
   const calls = useStore(callsStore);
   return useMemo(() => {
     const inRepair = new Set(calls.filter((c) => c.kind === "REPAIR" && c.status !== "COMPLETED").map((c) => c.busId));
-    return buses.map((bus) => mapBus(bus, inRepair));
+    // Por placa: el back no garantiza un orden y la lista saltaba (005, 004, 003…).
+    return buses.map((bus) => mapBus(bus, inRepair)).sort((a, b) => a.placa.localeCompare(b.placa, "es", { numeric: true }));
   }, [buses, calls]);
 }
 
@@ -53,7 +54,10 @@ export function useIncidents(): Incident[] {
   const buses = useStore(busesStore);
   return useMemo(() => {
     const plates = new Map(buses.map((b) => [b.id, b.plate]));
-    return incidents.map((i) => mapIncident(i, (busId) => plates.get(busId) ?? "—"));
+    // Los resueltos (todas sus alertas terminaron) ya no son trabajo pendiente: salen de la lista del admin.
+    return incidents
+      .filter((i) => i.status !== "RESOLVED")
+      .map((i) => mapIncident(i, (busId) => plates.get(busId) ?? "—"));
   }, [incidents, buses]);
 }
 

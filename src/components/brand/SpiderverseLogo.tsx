@@ -12,7 +12,7 @@ export function BrandLockup({ className }: { className?: string }) {
       <div className="min-w-0 leading-tight">
         <p className="truncate text-sm font-bold tracking-wide text-base-50">SPIDER-VERSE</p>
         <p className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-brand-500">
-          TransMilenio Admin
+          TransMilenio
         </p>
       </div>
     </div>

@@ -46,6 +46,8 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
   const [teamSent, setTeamSent] = useState(false);
   const [fleetAlerted, setFleetAlerted] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Mensaje del back cuando eliminar necesita confirmación (alguien atiende, o una ruta está asignada). */
+  const [forcePrompt, setForcePrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run(action: () => Promise<void>, done: () => void) {
@@ -55,6 +57,25 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
       done();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No se pudo completar la acción.");
+    }
+  }
+
+  /**
+   * Elimina el incidente. Si alguien lo está atendiendo (`CLAIMED`) o hay una ruta asignada (`ROUTE_ACTIVE`) el back
+   * responde 409: en vez de un error se pregunta si eliminarlo de todos modos. Una grúa en servicio (`TOW_ACTIVE`)
+   * sigue bloqueando: ahí se muestra el mensaje del back.
+   */
+  async function removeIncident(force: boolean) {
+    setError(null);
+    try {
+      await fleetActivityClient.deleteIncident(incident.id, force);
+      onClose();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && (e.reason === "CLAIMED" || e.reason === "ROUTE_ACTIVE")) {
+        setForcePrompt(e.message);
+      } else {
+        setError(e instanceof ApiError ? e.message : "No se pudo eliminar el incidente.");
+      }
     }
   }
 
@@ -176,7 +197,7 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
         <ActionRow
           icon={Trash2}
           title="Eliminar incidente"
-          description="Bórralo si se reportó por error. No se puede si ya hay alguien atendiéndolo."
+          description="Bórralo si se reportó por error o ya no importa. Si alguien lo está atendiendo te pedirá confirmar."
         >
           <button
             onClick={() => setConfirmDelete(true)}
@@ -198,16 +219,21 @@ function IncidentActionModalBody({ incident, onClose }: { incident: Incident; on
       <ConfirmModal
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        onConfirm={() =>
-          run(
-            () => fleetActivityClient.deleteIncident(incident.id),
-            () => onClose(),
-          )
-        }
+        onConfirm={() => void removeIncident(false)}
         icon={Trash2}
         title="¿Eliminar este incidente?"
-        description={`Se borrará "${incident.titulo}" de ${incident.placa} junto con sus alertas sin atender. Esta acción no se puede deshacer.`}
+        description={`Se borrará "${incident.titulo}" de ${incident.placa} junto con sus alertas. Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
+      />
+
+      <ConfirmModal
+        open={forcePrompt !== null}
+        onClose={() => setForcePrompt(null)}
+        onConfirm={() => void removeIncident(true)}
+        icon={Trash2}
+        title="Este incidente está en curso"
+        description={`${forcePrompt ?? ""} ¿Eliminarlo de todos modos?`}
+        confirmLabel="Eliminar de todos modos"
       />
     </div>
   );

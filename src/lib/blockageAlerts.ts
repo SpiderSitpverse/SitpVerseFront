@@ -52,6 +52,15 @@ export function dismissBlockageAlert(id: string) {
   save(next);
 }
 
+/** El admin eliminó o resolvió el incidente: sus avisos de bloqueo ya no valen (no esperar a que caduquen). */
+export function dismissBlockageAlertsFor(incidentId: string) {
+  const current = blockageAlertsStore.get();
+  const next = current.filter((a) => a.incidentId !== incidentId);
+  if (next.length === current.length) return;
+  blockageAlertsStore.set(next);
+  save(next);
+}
+
 export function clearBlockageAlerts() {
   blockageAlertsStore.set([]);
   save([]);

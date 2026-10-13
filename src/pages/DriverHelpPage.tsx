@@ -15,6 +15,7 @@ export function DriverHelpPage() {
   const requests = useHelpRequests();
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [receiving, setReceiving] = useState<string | null>(null);
 
   async function accept(id: string) {
     setError(null);
@@ -27,6 +28,18 @@ export function DriverHelpPage() {
       );
     } finally {
       setAccepting(null);
+    }
+  }
+
+  async function receive(id: string) {
+    setError(null);
+    setReceiving(id);
+    try {
+      await fleetActivityClient.confirmHelpReceived(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo confirmar la atención.");
+    } finally {
+      setReceiving(null);
     }
   }
 
@@ -123,10 +136,22 @@ export function DriverHelpPage() {
                   <p className="text-xs text-base-500">{timeAgo(req.createdAt)}</p>
                 </div>
                 {req.status === "aceptada" ? (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-status-online/10 px-2.5 py-1 text-[11px] font-medium text-status-online ring-1 ring-inset ring-status-online/25">
-                    <Check className="size-3 shrink-0" />
-                    {req.aceptadoPor ? `Aceptada por ${req.aceptadoPor}` : "Aceptada"}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-status-online/10 px-2.5 py-1 text-[11px] font-medium text-status-online ring-1 ring-inset ring-status-online/25">
+                      <Check className="size-3 shrink-0" />
+                      {req.aceptadoPor ? `Aceptada por ${req.aceptadoPor}` : "Aceptada"}
+                    </span>
+                    {/* Cuando la ayuda ya llegó, el conductor lo confirma: se cierra la alerta y se pagan los puntos. */}
+                    <button
+                      onClick={() => receive(req.id)}
+                      disabled={receiving === req.id}
+                      title="Confirma que la ayuda ya llegó: se cierra la alerta y se pagan los puntos a quien te ayudó"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
+                    >
+                      <Check className="size-3.5" />
+                      {receiving === req.id ? "Enviando..." : "Atención recibida"}
+                    </button>
+                  </div>
                 ) : (
                   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-base-800 px-2.5 py-1 text-[11px] font-medium text-base-300 ring-1 ring-inset ring-base-600">
                     Esperando ayuda
