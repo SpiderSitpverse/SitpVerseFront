@@ -30,7 +30,7 @@ export function LoginPage() {
       setPending(result.pending === true);
       return;
     }
-    navigate(roleHome(result.data), { replace: true });
+    await navigate(roleHome(result.data), { replace: true });
   }
 
   return (
