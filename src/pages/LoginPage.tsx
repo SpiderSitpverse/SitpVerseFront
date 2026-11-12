@@ -1,84 +1,36 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogIn, TriangleAlert } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { motion } from "framer-motion";
+import { Clock, LogIn, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import loginBg from "@/assets/media/login.jpg";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { BrandLockup } from "@/components/brand/SpiderverseLogo";
-import { TextField } from "@/components/ui/TextField";
 import { useAuth } from "@/context/AuthContext";
-import { changePassword } from "@/lib/auth";
 import { roleHome } from "@/lib/roles";
 
-type View = "login" | "change-password";
-
 export function LoginPage() {
-  const { userId, role, login } = useAuth();
+  const { userId, role, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useState<View>("login");
-
-  const [loginId, setLoginId] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
-
-  const [changeId, setChangeId] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changeError, setChangeError] = useState<string | null>(null);
-  const [changeSuccess, setChangeSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   if (userId) {
     return <Navigate to={roleHome(role)} replace />;
   }
 
-  async function handleLogin(e: FormEvent) {
-    e.preventDefault();
-    setLoginError(null);
-
+  async function handleCredential(idToken: string, nonce: string) {
+    setError(null);
+    setPending(false);
     setSubmitting(true);
-    const result = await login(loginId, loginPassword);
+    const result = await loginWithGoogle(idToken, nonce);
     setSubmitting(false);
     if (!result.success) {
-      setLoginError(result.error);
+      setError(result.error);
+      setPending(result.pending === true);
       return;
     }
-    navigate(roleHome(result.data), { replace: true });
-  }
-
-  async function handleChangePassword(e: FormEvent) {
-    e.preventDefault();
-    setChangeError(null);
-
-    if (newPassword !== confirmPassword) {
-      setChangeError("La nueva contraseña y su confirmación no coinciden.");
-      return;
-    }
-
-    setSubmitting(true);
-    const result = await changePassword(changeId, currentPassword, newPassword);
-    setSubmitting(false);
-    if (!result.success) {
-      setChangeError(result.error);
-      return;
-    }
-
-    setChangeSuccess(true);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-  }
-
-  function goToChangePassword() {
-    setChangeId(loginId);
-    setChangeError(null);
-    setChangeSuccess(false);
-    setView("change-password");
-  }
-
-  function goToLogin() {
-    setLoginError(null);
-    setView("login");
+    await navigate(roleHome(result.data), { replace: true });
   }
 
   return (
@@ -108,165 +60,57 @@ export function LoginPage() {
           <BrandLockup />
         </div>
 
-        <div className="w-full max-w-sm">
-          <AnimatePresence mode="wait">
-            {view === "login" ? (
-              <motion.div
-                key="login"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
+        <motion.div
+          className="w-full max-w-sm"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="mb-7 flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500 ring-1 ring-inset ring-brand-500/20">
+              <LogIn className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-base-50">Iniciar sesión</h1>
+              <p className="text-sm text-base-400">Entra con tu cuenta de Google</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <GoogleSignInButton onCredential={handleCredential} onError={setError} disabled={submitting} />
+
+            {submitting && <p className="text-center text-sm text-base-400">Verificando tu cuenta...</p>}
+
+            {error && pending && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg bg-brand-500/10 px-3 py-2.5 text-sm text-base-100 ring-1 ring-inset ring-brand-500/30"
               >
-                <div className="mb-7 flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500 ring-1 ring-inset ring-brand-500/20">
-                    <LogIn className="size-5" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-base-50">Iniciar sesión</h1>
-                    <p className="text-sm text-base-400">Ingresa tus credenciales para continuar</p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <TextField
-                    label="Número de empleado"
-                    placeholder="Ej. 2001"
-                    autoComplete="username"
-                    value={loginId}
-                    onChange={(e) => setLoginId(e.target.value)}
-                    required
-                  />
-                  <TextField
-                    label="Contraseña"
-                    type="password"
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                  />
-
-                  {loginError && (
-                    <div className="flex items-start gap-2 rounded-lg bg-status-danger/10 px-3 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
-                      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                      {loginError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
-                  >
-                    {submitting ? "Ingresando..." : "Iniciar sesión"}
-                  </button>
-                </form>
-
-                <button
-                  onClick={goToChangePassword}
-                  className="mt-5 w-full text-center text-xs font-medium text-base-400 transition-colors hover:text-brand-500"
-                >
-                  ¿Olvidaste tu contraseña? Cámbiala aquí
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="change-password"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="mb-7 flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500 ring-1 ring-inset ring-brand-500/20">
-                    <KeyRound className="size-5" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-base-50">Cambiar contraseña</h1>
-                    <p className="text-sm text-base-400">Verifica tu identidad para actualizarla</p>
-                  </div>
-                </div>
-
-                {changeSuccess ? (
-                  <div className="space-y-5">
-                    <div className="rounded-lg bg-status-online/10 px-3 py-2.5 text-sm text-status-online ring-1 ring-inset ring-status-online/25">
-                      Contraseña actualizada correctamente.
-                    </div>
-                    <button
-                      onClick={goToLogin}
-                      className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400"
-                    >
-                      Volver a iniciar sesión
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <form onSubmit={handleChangePassword} className="space-y-4">
-                      <TextField
-                        label="Número de empleado"
-                        placeholder="Ej. 2001"
-                        autoComplete="username"
-                        value={changeId}
-                        onChange={(e) => setChangeId(e.target.value)}
-                        required
-                      />
-                      <TextField
-                        label="Contraseña actual"
-                        type="password"
-                        placeholder="••••••••"
-                        autoComplete="current-password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        required
-                      />
-                      <TextField
-                        label="Nueva contraseña"
-                        type="password"
-                        placeholder="Mínimo 8, con letras y números"
-                        autoComplete="new-password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                      />
-                      <TextField
-                        label="Confirmar nueva contraseña"
-                        type="password"
-                        placeholder="Repite la nueva contraseña"
-                        autoComplete="new-password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                      />
-
-                      {changeError && (
-                        <div className="flex items-start gap-2 rounded-lg bg-status-danger/10 px-3 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25">
-                          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                          {changeError}
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20 transition-colors hover:bg-brand-400 disabled:opacity-60"
-                      >
-                        {submitting ? "Guardando..." : "Guardar contraseña"}
-                      </button>
-                    </form>
-
-                    <button
-                      onClick={goToLogin}
-                      className="mt-5 w-full text-center text-xs font-medium text-base-400 transition-colors hover:text-brand-500"
-                    >
-                      Volver a iniciar sesión
-                    </button>
-                  </>
-                )}
-              </motion.div>
+                <Clock className="mt-0.5 size-4 shrink-0 text-brand-500" />
+                <span>
+                  <strong className="block font-semibold">Solicitud enviada</strong>
+                  {error} Cuando lo haga, vuelve a entrar con Google.
+                </span>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+
+            {error && !pending && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-lg bg-status-danger/10 px-3 py-2.5 text-sm text-status-danger ring-1 ring-inset ring-status-danger/25"
+              >
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                {error}
+              </div>
+            )}
+          </div>
+
+          <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-base-400">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-base-500" />
+            Si es tu primera vez, tu solicitud queda en espera hasta que un administrador la acepte y te asigne un rol.
+            SitpVerse no guarda contraseñas.
+          </p>
+        </motion.div>
       </div>
     </div>
   );

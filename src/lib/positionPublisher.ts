@@ -34,7 +34,7 @@ export interface PublisherOptions {
   sendEveryMs: number;
 }
 
-export const DEFAULT_OPTIONS: PublisherOptions = {
+const DEFAULT_OPTIONS: PublisherOptions = {
   goodFixMeters: 50,
   minWarmupMs: 8_000,
   stallMs: 8_000,
@@ -155,48 +155,65 @@ export class PositionPublisher {
   }
 
   push(reading: GpsFix, now: number): PublisherUpdate {
+    const accuracy = reading.accuracy;
+    const warmed = this.warmUp(reading, now);
+    if (!warmed) return { state: "searching", publish: null, accuracy };
+    if (this.shouldIgnore(reading, warmed)) return { state: this.holdState(now), publish: null, accuracy };
+    this.lastReadingAt = reading.timestamp;
+    return this.track(reading, warmed, now);
+  }
+
+  /** 1. Espera inicial: devuelve la lectura a usar, o null mientras se sigue buscando una buena. */
+  private warmUp(reading: GpsFix, now: number): GpsFix | null {
+    if (this.accepted) return reading;
     const o = this.options;
     const accuracy = reading.accuracy;
-    let fix = reading;
-
-    // 1. Espera inicial.
-    if (!this.accepted) {
-      if (!this.best || accuracy < this.best.accuracy) {
-        this.best = reading;
-        this.bestAt = now;
-      }
-      const good = accuracy <= o.goodFixMeters;
-      const stalled = now - this.openedAt >= o.minWarmupMs && now - this.bestAt >= o.stallMs;
-      if (!good && !stalled && now - this.openedAt < o.warmupMs) return { state: "searching", publish: null, accuracy };
-      this.accepted = true;
-      if (!good) fix = this.best;
+    if (!this.best || accuracy < this.best.accuracy) {
+      this.best = reading;
+      this.bestAt = now;
     }
+    const good = accuracy <= o.goodFixMeters;
+    const stalled = now - this.openedAt >= o.minWarmupMs && now - this.bestAt >= o.stallMs;
+    if (!good && !stalled && now - this.openedAt < o.warmupMs) return null;
+    this.accepted = true;
+    return good ? reading : this.best;
+  }
 
-    // 1b. Lecturas que no sirven, una vez que ya hubo una posición aprovechable:
-    //  (a) precisión pésima: típico de un navegador de escritorio que de pronto cae a la ubicación por IP (a decenas de
-    //      km, con miles de metros de margen). No dice dónde está el bus: se ignora.
-    //  (b) un salto físicamente imposible (un bus no recorre 20 km en 2 s): puede ser un fallo del proveedor. Se
-    //      ignora hasta que se repita varias lecturas seguidas; entonces se acepta como una reubicación real.
-    if (this.usableFix) {
-      if (accuracy > REJECT_ABOVE_METERS) return { state: this.holdState(now), publish: null, accuracy };
-      if (this.estimate) {
-        const seconds = Math.max(1, (reading.timestamp - this.lastReadingAt) / 1000);
-        const limit = Math.max(JUMP_MIN_METERS, MAX_BUS_SPEED * seconds + 3 * accuracy);
-        if (distanceMeters(this.estimate, [fix.lat, fix.lng]) > limit) {
-          this.teleports += 1;
-          if (this.teleports < TELEPORT_CONFIRM_READINGS) {
-            this.lastReadingAt = reading.timestamp;
-            return { state: this.holdState(now), publish: null, accuracy };
-          }
-          this.relocate();
-        } else {
-          this.teleports = 0;
-        }
-      }
-    } else if (accuracy <= USABLE_FIX_METERS) {
-      this.usableFix = true;
+  /**
+   * 1b. Lecturas que no sirven, una vez que ya hubo una posición aprovechable:
+   *  (a) precisión pésima: típico de un navegador de escritorio que de pronto cae a la ubicación por IP (a decenas de
+   *      km, con miles de metros de margen). No dice dónde está el bus: se ignora.
+   *  (b) un salto físicamente imposible (un bus no recorre 20 km en 2 s): puede ser un fallo del proveedor. Se
+   *      ignora hasta que se repita varias lecturas seguidas; entonces se acepta como una reubicación real.
+   */
+  private shouldIgnore(reading: GpsFix, fix: GpsFix): boolean {
+    const accuracy = reading.accuracy;
+    if (!this.usableFix) {
+      if (accuracy <= USABLE_FIX_METERS) this.usableFix = true;
+      return false;
     }
-    this.lastReadingAt = reading.timestamp;
+    if (accuracy > REJECT_ABOVE_METERS) return true;
+    if (!this.estimate) return false;
+
+    const seconds = Math.max(1, (reading.timestamp - this.lastReadingAt) / 1000);
+    const limit = Math.max(JUMP_MIN_METERS, MAX_BUS_SPEED * seconds + 3 * accuracy);
+    if (distanceMeters(this.estimate, [fix.lat, fix.lng]) <= limit) {
+      this.teleports = 0;
+      return false;
+    }
+    this.teleports += 1;
+    if (this.teleports < TELEPORT_CONFIRM_READINGS) {
+      this.lastReadingAt = reading.timestamp;
+      return true;
+    }
+    this.relocate();
+    return false;
+  }
+
+  /** 2 a 6: filtra la lectura y decide si hay algo nuevo que publicar. */
+  private track(reading: GpsFix, fix: GpsFix, now: number): PublisherUpdate {
+    const o = this.options;
+    const accuracy = reading.accuracy;
 
     // 2. Un punto marcado a mano se sostiene frente a lecturas imprecisas y sin movimiento; un GPS bueno lo libera.
     if (this.pinned && accuracy <= o.goodFixMeters) this.pinned = false;
@@ -229,16 +246,23 @@ export class PositionPublisher {
       return this.send(here, now, accuracy, "moving");
     }
     if (distanceMeters(this.anchor, here) > this.radius()) {
-      // Una salida suelta puede ser ruido (sale hacia cualquier lado); dos seguidas hacia el MISMO lado en poco
-      // tiempo son un bus que avanza.
-      const heading = bearing(this.anchor, here);
-      if (this.lastExit && now - this.lastExit.at <= EXIT_CONFIRM_MS && angleBetween(heading, this.lastExit.heading) <= SAME_DIRECTION_DEG) {
-        this.movingUntil = now + MOVING_HOLD_MS;
-      }
-      this.lastExit = { at: now, heading };
+      this.registerExit(here, now);
       return this.send(here, now, accuracy, "moving");
     }
     return { state: inMotion ? "moving" : "still", publish: null, accuracy };
+  }
+
+  /**
+   * Una salida suelta de la zona muerta puede ser ruido (sale hacia cualquier lado); dos seguidas hacia el MISMO lado
+   * en poco tiempo son un bus que avanza.
+   */
+  private registerExit(here: LatLng, now: number) {
+    const heading = bearing(this.anchor as LatLng, here);
+    const last = this.lastExit;
+    if (last && now - last.at <= EXIT_CONFIRM_MS && angleBetween(heading, last.heading) <= SAME_DIRECTION_DEG) {
+      this.movingUntil = now + MOVING_HOLD_MS;
+    }
+    this.lastExit = { at: now, heading };
   }
 
   private holdState(now: number): MotionState {
