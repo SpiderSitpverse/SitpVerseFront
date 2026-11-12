@@ -156,7 +156,9 @@ export function mapStaff(user: ApiUser): StaffMember {
     id: user.id,
     nombre: user.name,
     rol: ROLE_LABEL[user.role] ?? user.role,
+    rolApi: user.role,
     numeroEmpleado: user.employeeId,
+    correo: user.email ?? "",
     activo: user.active !== false,
   };
 }

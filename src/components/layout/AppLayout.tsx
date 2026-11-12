@@ -7,7 +7,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { Topbar } from "@/components/layout/Topbar";
 
-export const ADMIN_NAV_ITEMS: NavItem[] = [
+const ADMIN_NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Inicio", icon: LayoutDashboard, end: true },
   { to: "/buses", label: "Buses", icon: Bus },
   { to: "/incidentes", label: "Incidentes", icon: TriangleAlert },

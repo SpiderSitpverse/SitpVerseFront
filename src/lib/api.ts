@@ -6,6 +6,8 @@ export const API_URL = String(import.meta.env.VITE_API_URL ?? "http://localhost:
 
 const TOKEN_KEY = "sitpverse.token";
 export const UNAUTHORIZED_EVENT = "sitpverse:unauthorized";
+/** Un 403 con sesión puede significar que cambiaron el rol de esta persona: la app vuelve a preguntar quién es. */
+export const FORBIDDEN_EVENT = "sitpverse:forbidden";
 
 export function getToken(): string | null {
   try {
@@ -77,6 +79,9 @@ async function send<T>(path: string, init: RequestInit, options: RequestOptions)
   if (!res.ok) {
     if (res.status === 401 && options.session !== false && getToken()) {
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    if (res.status === 403 && options.session !== false && getToken()) {
+      window.dispatchEvent(new Event(FORBIDDEN_EVENT));
     }
     throw new ApiError(res.status, errorMessage(res.status, data), (data as { reason?: string } | null)?.reason);
   }

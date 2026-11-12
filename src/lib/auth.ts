@@ -14,7 +14,8 @@ export interface Session {
   nombre: string;
 }
 
-export type AuthResult<T> = { success: true; data: T } | { success: false; error: string };
+/** `pending`: no es un fallo, la persona quedó en espera de que un administrador la acepte. */
+export type AuthResult<T> = { success: true; data: T } | { success: false; error: string; pending?: boolean };
 
 interface LoginResponse {
   accessToken: string;
@@ -39,23 +40,32 @@ export function sessionFromUser(user: ApiUser): Session {
 function messageOf(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.status === 429) return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+    if (error.status === 403) return error.message; // el back dice si la solicitud está en espera o fue rechazada
+    if (error.status === 401) return "No se pudo verificar tu cuenta de Google. Inténtalo de nuevo.";
     return error.message;
   }
   return fallback;
 }
 
-/** POST /auth/login con el número de empleado. Guarda el JWT; la sesión la guarda el AuthContext. */
-export async function verifyLogin(employeeId: string, password: string): Promise<AuthResult<Session>> {
+/** GET /auth/nonce: valor de un solo uso que se pone en la petición a Google (protege contra respuestas repetidas). */
+export async function fetchLoginNonce(): Promise<string> {
+  const res = await api<{ nonce: string }>("/auth/nonce", { session: false });
+  return res.nonce;
+}
+
+/** POST /auth/google con el ID token de Google. Guarda el JWT de sesión; la sesión la guarda el AuthContext. */
+export async function verifyGoogleLogin(idToken: string, nonce: string): Promise<AuthResult<Session>> {
   try {
-    const res = await api<LoginResponse>("/auth/login", {
+    const res = await api<LoginResponse>("/auth/google", {
       method: "POST",
-      body: { employeeId: employeeId.trim(), password },
+      body: { idToken, nonce },
       session: false,
     });
     setToken(res.accessToken);
     return { success: true, data: sessionFromUser(res.user) };
   } catch (error) {
-    return { success: false, error: messageOf(error, "No se pudo iniciar sesión.") };
+    const pending = error instanceof ApiError && error.reason === "PENDING_APPROVAL";
+    return { success: false, error: messageOf(error, "No se pudo iniciar sesión."), pending };
   }
 }
 
@@ -67,36 +77,6 @@ export async function fetchCurrentUser(): Promise<Session | null> {
   } catch (error) {
     if (error instanceof ApiError && error.status === 0) throw error; // sin red: no cerrar la sesión
     return null;
-  }
-}
-
-/**
- * Cambia la contraseña desde el login: el back exige sesión, así que primero se valida la
- * contraseña actual con un login y se usa ese token solo para este cambio (no abre sesión).
- */
-export async function changePassword(
-  employeeId: string,
-  currentPassword: string,
-  newPassword: string,
-): Promise<AuthResult<null>> {
-  if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    return { success: false, error: "La nueva contraseña debe tener al menos 8 caracteres, con letras y números." };
-  }
-  try {
-    const login = await api<LoginResponse>("/auth/login", {
-      method: "POST",
-      body: { employeeId: employeeId.trim(), password: currentPassword },
-      session: false,
-    });
-    await api("/auth/change-password", {
-      method: "POST",
-      body: { currentPassword, newPassword },
-      token: login.accessToken,
-      session: false,
-    });
-    return { success: true, data: null };
-  } catch (error) {
-    return { success: false, error: messageOf(error, "No se pudo cambiar la contraseña.") };
   }
 }
 

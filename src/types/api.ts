@@ -6,7 +6,20 @@ export interface ApiUser {
   employeeId: string;
   name: string;
   role: ApiRole;
+  email?: string;
+  photoUrl?: string | null;
   active?: boolean;
+}
+
+/** Quien entró con Google sin tener cuenta: espera a que un administrador la acepte y le dé un rol. */
+export interface ApiAccessRequest {
+  id: string;
+  email: string;
+  name: string;
+  photoUrl: string | null;
+  status: "PENDING" | "REJECTED";
+  requestedAt: string;
+  lastAttemptAt: string;
 }
 
 export interface ApiBus {
