@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Listener = (...args: unknown[]) => void;
-const sockets: { options: Record<string, unknown>; on: ReturnType<typeof vi.fn>; listeners: Record<string, Listener> }[] = [];
+type FakeSocket = {
+  options: Record<string, unknown>;
+  listeners: Record<string, Listener>;
+  on: ReturnType<typeof vi.fn>;
+  removeAllListeners: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+};
+const sockets: FakeSocket[] = [];
 
 vi.mock("socket.io-client", () => ({
   io: vi.fn((_url: string, options: Record<string, unknown>) => {
