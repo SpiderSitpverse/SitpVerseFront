@@ -5,12 +5,15 @@ import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip
 import { BOGOTA_CENTER, troncales } from "@/data/routes";
 import { useActiveTrips } from "@/hooks/useFleetActivity";
 import { useBuses } from "@/hooks/useFleetData";
+import { useNow } from "@/hooks/useNow";
 import { useSmoothPosition } from "@/hooks/useSmoothPosition";
+import { formatSignalAge, isWithoutSignal, signalAgeMs } from "@/lib/signal";
 import type { Bus } from "@/types/bus";
 import type { ActiveTrip } from "@/types/driver";
 import type { AlternativeRoute, LatLngTuple, RouteState } from "@/types/routing";
 
 const LIVE_TRIP_COLOR = "#3b82f6";
+const NO_SIGNAL_COLOR = "#9ca3af";
 
 /** Color de cada ruta alternativa según su estado: ámbar = propuesta, azul = asignada, verde = aceptada. */
 const ROUTE_COLOR: Record<RouteState, string> = { propuesta: "#f59e0b", asignada: "#38bdf8", aceptada: "#22c55e" };
@@ -37,6 +40,18 @@ function liveTripIcon() {
   });
 }
 
+/** Bus «Sin señal»: gris y quieto (sin el pulso de "en vivo"), para que salte a la vista en el mapa. */
+function noSignalIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<span class="relative flex size-4 items-center justify-center rounded-full ring-2 ring-status-danger" style="background-color:${NO_SIGNAL_COLOR}">
+      <span class="text-[9px] font-bold leading-none text-base-950">!</span>
+    </span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
 function formatStartedAt(iso: string) {
   return new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
 }
@@ -47,6 +62,9 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
   const activeTrips = useActiveTrips();
   const buses = useBuses();
   const icon = useMemo(() => liveTripIcon(), []);
+  const staleIcon = useMemo(() => noSignalIcon(), []);
+  const now = useNow(5000); // vuelve a evaluar quién está «Sin señal» aunque no llegue ningún evento
+  const withoutSignal = activeTrips.filter((trip) => isWithoutSignal(trip.busId, trip.lastPositionAt, now)).length;
 
   function openReport(busId: string, fallback: Partial<Bus>) {
     const match = buses.find((b) => b.id === busId);
@@ -100,25 +118,56 @@ function RouteLayers({ onSelectBus }: { onSelectBus?: (bus: Bus) => void }) {
         <LiveBusMarker
           key={trip.busId}
           trip={trip}
-          icon={icon}
+          icon={isWithoutSignal(trip.busId, trip.lastPositionAt, now) ? staleIcon : icon}
+          signalAgeMs={isWithoutSignal(trip.busId, trip.lastPositionAt, now) ? signalAgeMs(trip.busId, trip.lastPositionAt, now) : undefined}
           onOpenReport={onSelectBus ? () => openReport(trip.busId, { placa: trip.placa, troncal: trip.troncal }) : undefined}
         />
       ))}
+
+      {withoutSignal > 0 && (
+        <div className="leaflet-top leaflet-right">
+          <div
+            role="status"
+            className="leaflet-control m-3 flex items-center gap-2 rounded-lg bg-base-950/90 px-3 py-2 text-xs font-semibold text-base-100 ring-1 ring-status-danger/60"
+          >
+            <span className="size-2 rounded-full bg-status-danger" />
+            {withoutSignal} {withoutSignal === 1 ? "bus sin señal" : "buses sin señal"}
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 /** Un bus en vivo: su posición se pega a la línea de su troncal y se anima entre lecturas (ver useSmoothPosition). */
-function LiveBusMarker({ trip, icon, onOpenReport }: { trip: ActiveTrip; icon: L.DivIcon; onOpenReport?: () => void }) {
+function LiveBusMarker({
+  trip,
+  icon,
+  signalAgeMs: staleFor,
+  onOpenReport,
+}: {
+  trip: ActiveTrip;
+  icon: L.DivIcon;
+  /** Definido solo si el bus está «Sin señal»: hace cuánto llegó su última posición. */
+  signalAgeMs?: number;
+  onOpenReport?: () => void;
+}) {
   const position = useSmoothPosition(trip.lat, trip.lng, trip.troncal);
   if (!position) return null;
   return (
     <Marker position={position} icon={icon}>
       <Popup>
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
-          <span className="size-1.5 rounded-full bg-blue-600" />
-          En vivo
-        </p>
+        {staleFor === undefined ? (
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
+            <span className="size-1.5 rounded-full bg-blue-600" />
+            En vivo
+          </p>
+        ) : (
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-600">
+            <span className="size-1.5 rounded-full bg-red-600" />
+            Sin señal · última posición {formatSignalAge(staleFor)}
+          </p>
+        )}
         <p className="mt-1 text-sm font-bold text-base-950">{trip.placa}</p>
         <p className="text-xs text-base-500">{trip.troncal}</p>
         <p className="mt-1 text-xs text-base-600">

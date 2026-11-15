@@ -3,6 +3,7 @@ import { clearBlockageAlerts, dismissBlockageAlertsFor, recordBlockageAlert } fr
 import { mapInspection } from "@/lib/mappers";
 import { clearNotifications, dismissWhere, pushNotification } from "@/lib/notifications";
 import { connectRealtime, type AssistanceEvent, type FleetPositionEvent } from "@/lib/realtime";
+import { clearSignals, markPositionSeen } from "@/lib/signal";
 import { createStore } from "@/lib/store";
 import type {
   ApiAlternativeRoute,
@@ -109,6 +110,7 @@ async function refreshAssistance(role: ApiRole): Promise<void> {
 }
 
 function applyPosition(event: FleetPositionEvent) {
+  markPositionSeen(event.busId);
   const buses = busesStore.get();
   const current = buses.find((b) => b.id === event.busId);
   if (!current) {
@@ -334,6 +336,7 @@ export function stopSync() {
   blockagesStore.set([]);
   assignedRoutesStore.set([]);
   clearBlockageAlerts();
+  clearSignals();
   homeStore.set(null);
   fleetSummaryStore.set(null);
   assistanceSummaryStore.set(null);

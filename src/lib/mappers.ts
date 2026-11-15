@@ -74,6 +74,7 @@ export function mapActiveTrip(bus: ApiBus): ActiveTrip {
     driverId: bus.driverId ?? "",
     driverName: bus.driver ?? "Conductor",
     startedAt: bus.tripStartedAt ?? bus.updatedAt,
+    lastPositionAt: bus.updatedAt,
     lat: num(bus.latitude),
     lng: num(bus.longitude),
   };

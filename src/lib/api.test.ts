@@ -126,4 +126,52 @@ describe("cliente HTTP", () => {
     expect(toRelativeUrl(`${API_URL}/uploads/a.jpg`)).toBe("/uploads/a.jpg");
     expect(toRelativeUrl("https://otro.com/a.jpg")).toBe("https://otro.com/a.jpg");
   });
+
+  describe("reintento (ESC-DISP-01: una instancia del back cae en mitad de la petición)", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const settle = async <T,>(work: Promise<T>) => {
+      const guarded = work.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      await vi.runAllTimersAsync();
+      return guarded;
+    };
+
+    it("un GET que recibe 503 se reintenta y el usuario no ve el fallo", async () => {
+      fetchMock.mockReturnValueOnce(reply(503, { message: "instancia caída" })).mockReturnValueOnce(reply(200, { ok: true }));
+      expect(await settle(api("/fleet/buses"))).toEqual({ value: { ok: true } });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("un PATCH (la posición GPS) que pierde la conexión se reintenta", async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockReturnValueOnce(reply(200, { id: "b1" }));
+      expect(await settle(api("/fleet/buses/b1/position", { method: "PATCH", body: { latitude: 4.6, longitude: -74.1 } }))).toEqual({
+        value: { id: "b1" },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("tras agotar los reintentos (3 intentos) se informa el error", async () => {
+      fetchMock.mockImplementation(() => reply(502, {}));
+      const result = await settle(api("/fleet/buses"));
+      expect((result as { error: ApiError }).error.status).toBe(502);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it("un POST NO se reintenta solo (aceptar una alerta dos veces sería un error)", async () => {
+      fetchMock.mockImplementation(() => reply(503, {}));
+      const result = await settle(api("/assistance/calls/c1/accept", { method: "POST" }));
+      expect((result as { error: ApiError }).error.status).toBe(503);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("un 409 o un 500 no se reintentan: no son fallos de una instancia caída", async () => {
+      fetchMock.mockImplementation(() => reply(409, { message: "conflicto" }));
+      await settle(api("/fleet/buses/b1/start-trip", { method: "PATCH" }));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });
