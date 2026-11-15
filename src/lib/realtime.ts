@@ -53,7 +53,8 @@ export function connectRealtime(token: string, handlers: RealtimeHandlers): () =
   const socket: Socket = io(`${API_URL}/realtime`, {
     // `auth` es una función: en CADA reconexión se manda el último `seq` visto (no el del primer intento), para que el
     // servidor reenvíe exactamente lo que se perdió mientras el socket estuvo caído.
-    auth: (cb) => cb({ token, lastSeq }),
+    // `batch`: las posiciones llegan agrupadas (la última de cada bus cada 250 ms) en vez de una por mensaje.
+    auth: (cb) => cb({ token, lastSeq, batch: true }),
     // Solo WebSocket (sin "long polling"): el back corre en varias instancias SIN afinidad de sesión, y el polling
     // necesita que todas las peticiones de una conexión caigan en la misma. Así, si una instancia cae, el socket se
     // reconecta a cualquiera de las otras (ESC-DISP-01).
@@ -69,6 +70,7 @@ export function connectRealtime(token: string, handlers: RealtimeHandlers): () =
   });
   socket.on("unauthorized", handlers.onUnauthorized);
   socket.on("fleet:position-updated", handlers.onPosition);
+  socket.on("fleet:positions-batch", (batch: FleetPositionEvent[]) => batch.forEach(handlers.onPosition));
   socket.on("assistance:event", (event: AssistanceEvent) => {
     if (seen.has(event.eventId)) return;
     seen.add(event.eventId);
