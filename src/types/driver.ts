@@ -17,6 +17,8 @@ export interface ActiveTrip {
   driverId: string;
   driverName: string;
   startedAt: string;
+  /** Última vez que el servidor actualizó el bus (su última posición): base para marcarlo «Sin señal». */
+  lastPositionAt?: string;
   lat?: number;
   lng?: number;
 }

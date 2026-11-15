@@ -55,6 +55,30 @@ function errorMessage(status: number, data: unknown): string {
   return "No se pudo completar la solicitud.";
 }
 
+/**
+ * Reintento del cliente (ESC-DISP-01): si una instancia del back cae en mitad de una petición, el balanceador responde
+ * 502/503/504 o corta la conexión. Reintentar hace que la petición caiga en una instancia viva y el usuario no vea el
+ * fallo. Solo se reintenta lo que se puede repetir sin efectos dobles: GET, PUT, PATCH y DELETE. Un POST (crear un
+ * incidente, aceptar una alerta) NO se reintenta solo: podría ejecutarse dos veces.
+ */
+export const RETRY_DELAYS_MS = [300, 900];
+const RETRIABLE_STATUS = new Set([502, 503, 504]);
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  const repeatable = (init.method ?? "GET").toUpperCase() !== "POST";
+  for (let attempt = 0; ; attempt++) {
+    const last = !repeatable || attempt >= RETRY_DELAYS_MS.length;
+    try {
+      const res = await fetch(url, init);
+      if (last || !RETRIABLE_STATUS.has(res.status)) return res;
+    } catch (error) {
+      if (last) throw error;
+    }
+    await wait(RETRY_DELAYS_MS[attempt]);
+  }
+}
+
 async function send<T>(path: string, init: RequestInit, options: RequestOptions): Promise<T> {
   const token = options.token ?? getToken();
   const headers = new Headers(init.headers);
@@ -62,7 +86,7 @@ async function send<T>(path: string, init: RequestInit, options: RequestOptions)
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+    res = await fetchWithRetry(`${API_URL}${path}`, { ...init, headers });
   } catch {
     throw new ApiError(0, "No se pudo conectar con el servidor.");
   }
