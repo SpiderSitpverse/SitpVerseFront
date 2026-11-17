@@ -2,7 +2,14 @@
  * Cliente HTTP del back (NestJS). Contrato en SitpVerseBack/docs/API.md.
  * La URL base sale de `VITE_API_URL`; el JWT vive en sessionStorage (una sesión por pestaña).
  */
-export const API_URL = String(import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+/** Quita las barras del final (`https://back//` → `https://back`) sin expresión regular: así no hay costo super-lineal. */
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end--;
+  return url.slice(0, end);
+}
+
+export const API_URL = trimTrailingSlashes(String(import.meta.env.VITE_API_URL ?? "http://localhost:3000"));
 
 const TOKEN_KEY = "sitpverse.token";
 export const UNAUTHORIZED_EVENT = "sitpverse:unauthorized";

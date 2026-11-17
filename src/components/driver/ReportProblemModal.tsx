@@ -55,8 +55,8 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-base-300">Motivo</label>
-            <select
+            <label htmlFor="problema-motivo" className="block text-xs font-medium text-base-300">Motivo</label>
+            <select id="problema-motivo"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               className="w-full rounded-lg border border-base-700 bg-base-900 px-3.5 py-2.5 text-sm text-base-100 outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/15"
@@ -70,8 +70,8 @@ export function ReportProblemModal({ open, onClose, onSubmit }: ReportProblemMod
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-base-300">Detalle (opcional)</label>
-            <textarea
+            <label htmlFor="problema-detalle" className="block text-xs font-medium text-base-300">Detalle (opcional)</label>
+            <textarea id="problema-detalle"
               value={detalle}
               onChange={(e) => setDetalle(e.target.value)}
               rows={3}

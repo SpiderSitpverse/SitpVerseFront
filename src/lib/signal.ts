@@ -22,7 +22,7 @@ export function clearSignals(): void {
 export function signalAgeMs(busId: string, serverUpdatedAt: string | undefined, now: number = Date.now()): number {
   const local = seenAt.get(busId);
   if (local !== undefined) return Math.max(0, now - local);
-  const server = serverUpdatedAt ? Date.parse(serverUpdatedAt) : NaN;
+  const server = serverUpdatedAt ? Date.parse(serverUpdatedAt) : Number.NaN;
   return Number.isFinite(server) ? Math.max(0, now - server) : 0;
 }
 

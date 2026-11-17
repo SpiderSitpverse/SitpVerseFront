@@ -20,7 +20,7 @@ export function RoutesSection({ incident, onClose }: { incident: Incident; onClo
 
   function openMap() {
     onClose();
-    navigate("/buses", { state: { incidentId: incident.id } });
+    void navigate("/buses", { state: { incidentId: incident.id } });
   }
 
   return (

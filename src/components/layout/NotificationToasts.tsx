@@ -17,7 +17,7 @@ function Toast({ notification }: { notification: Notification }) {
 
   function open() {
     dismissNotification(notification.id);
-    if (notification.to) navigate(notification.to);
+    if (notification.to) void navigate(notification.to);
   }
 
   return (

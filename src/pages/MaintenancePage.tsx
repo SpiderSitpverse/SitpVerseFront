@@ -107,7 +107,7 @@ export function MaintenancePage() {
               <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-base-400">
                 {SECTION_STYLE.aceptada.label}
               </p>
-              {enReparacion.map(renderRow)}
+              {enReparacion.map((req, index) => renderRow(req, index))}
             </div>
           )}
 
@@ -116,7 +116,7 @@ export function MaintenancePage() {
               <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-base-400">
                 {SECTION_STYLE.pendiente.label}
               </p>
-              {pendientes.map(renderRow)}
+              {pendientes.map((req, index) => renderRow(req, index))}
             </div>
           )}
 
@@ -125,7 +125,7 @@ export function MaintenancePage() {
               <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-base-400">
                 {SECTION_STYLE.completada.label}
               </p>
-              {completadas.map(renderRow)}
+              {completadas.map((req, index) => renderRow(req, index))}
             </div>
           )}
         </CardContent>

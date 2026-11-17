@@ -22,7 +22,7 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
   function handleLogout() {
     logout();
     onNavigate?.();
-    navigate("/login", { replace: true });
+    void navigate("/login", { replace: true });
   }
 
   const displayName = nombre ?? userId ?? "?";
