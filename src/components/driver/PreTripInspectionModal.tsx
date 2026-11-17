@@ -76,8 +76,8 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-base-300">Nota</label>
-            <input
+            <label htmlFor="pretrip-nota" className="block text-xs font-medium text-base-300">Nota</label>
+            <input id="pretrip-nota"
               value={nota}
               onChange={(e) => setNota(e.target.value)}
               placeholder="Ej. Inspección de turno sin novedades"
@@ -86,8 +86,8 @@ export function PreTripInspectionModal({ open, onClose, assignment, onSubmit }: 
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-base-300">Comentario (opcional)</label>
-            <textarea
+            <label htmlFor="pretrip-comentario" className="block text-xs font-medium text-base-300">Comentario (opcional)</label>
+            <textarea id="pretrip-comentario"
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
               rows={3}

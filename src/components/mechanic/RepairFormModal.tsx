@@ -122,8 +122,8 @@ function RepairFormModalBody({
 
       <div className="space-y-5">
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-base-300">Daños encontrados</label>
-          <textarea
+          <label htmlFor="reparacion-danos" className="block text-xs font-medium text-base-300">Daños encontrados</label>
+          <textarea id="reparacion-danos"
             value={danos}
             onChange={(e) => setDanos(e.target.value)}
             rows={3}
@@ -133,8 +133,8 @@ function RepairFormModalBody({
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-base-300">Piezas reemplazadas (opcional)</label>
-          <input
+          <label htmlFor="reparacion-piezas" className="block text-xs font-medium text-base-300">Piezas reemplazadas (opcional)</label>
+          <input id="reparacion-piezas"
             value={piezas}
             onChange={(e) => setPiezas(e.target.value)}
             placeholder="Ej. pastillas de freno, filtro de aceite..."
@@ -144,7 +144,7 @@ function RepairFormModalBody({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-medium text-base-300">Gastos</label>
+            <span className="block text-xs font-medium text-base-300">Gastos</span>
             <span className="text-xs font-semibold text-base-200">{CURRENCY.format(total)}</span>
           </div>
 
