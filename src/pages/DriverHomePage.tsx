@@ -18,6 +18,8 @@ import { PositionPublisher } from "@/lib/positionPublisher";
 
 /** Una lectura con este margen de error (metros) o mejor se considera "señal GPS buena" (solo para el color). */
 const GOOD_FIX_METERS = 50;
+/** Cada cuánto se revisa si toca repetir la última posición (el publicador decide con su propio plazo). */
+const KEEP_ALIVE_CHECK_MS = 2_000;
 
 export function DriverHomePage() {
   const { userId, nombre } = useAuth();
@@ -66,7 +68,13 @@ export function DriverHomePage() {
       // maximumAge 0: siempre una lectura nueva (no una guardada); timeout: no esperar para siempre.
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
     );
+    // Latido: si el bus está quieto no se publica nada y el mapa lo marcaría «Sin señal»; se repite la última posición.
+    const beat = window.setInterval(() => {
+      const point = publisher.keepAlive(Date.now());
+      if (point) fleetActivityClient.sendPosition(busId, point[0], point[1]).catch(() => undefined);
+    }, KEEP_ALIVE_CHECK_MS);
     return () => {
+      window.clearInterval(beat);
       navigator.geolocation.clearWatch(watchId);
       setAccuracy(null);
       setHasFix(false);
