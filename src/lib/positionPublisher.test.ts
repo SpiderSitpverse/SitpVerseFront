@@ -161,6 +161,43 @@ describe("PositionPublisher", () => {
     });
   });
 
+  describe("latido (keepAlive)", () => {
+    it("sin posición conocida todavía no hay nada que repetir", () => {
+      const publisher = new PositionPublisher();
+      publisher.reset(0);
+      expect(publisher.keepAlive(60_000)).toBeNull();
+    });
+
+    it("un bus quieto repite la última posición pasado el plazo, y solo entonces", () => {
+      const publisher = new PositionPublisher();
+      publisher.reset(0);
+      publisher.pin(HOME, 0);
+      expect(publisher.keepAlive(7_999)).toBeNull();
+      expect(publisher.keepAlive(8_000)).toEqual(HOME);
+      expect(publisher.keepAlive(12_000)).toBeNull(); // acaba de repetirse
+      expect(publisher.keepAlive(16_000)).toEqual(HOME);
+    });
+
+    it("mantiene el bus por debajo de los 15 s de «Sin señal» aunque no se mueva", () => {
+      const publisher = new PositionPublisher();
+      publisher.reset(0);
+      publisher.pin(HOME, 0);
+      let last = 0;
+      for (let t = 0; t <= 120_000; t += 2_000) {
+        if (publisher.keepAlive(t)) last = t;
+        expect(t - last).toBeLessThan(15_000);
+      }
+    });
+
+    it("reset() olvida la posición: ya no repite la del viaje anterior", () => {
+      const publisher = new PositionPublisher();
+      publisher.reset(0);
+      publisher.pin(HOME, 0);
+      publisher.reset(1_000);
+      expect(publisher.keepAlive(60_000)).toBeNull();
+    });
+  });
+
   it("reset() empieza de cero (nuevo viaje)", () => {
     const gauss = rng(11);
     const publisher = new PositionPublisher();

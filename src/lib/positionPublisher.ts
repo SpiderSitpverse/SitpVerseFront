@@ -32,6 +32,8 @@ export interface PublisherOptions {
   movingSpeed: number;
   /** Separación mínima entre dos publicaciones (ms). */
   sendEveryMs: number;
+  /** Si no se publicó nada en este tiempo (ms), `keepAlive` repite la última posición: «sigo aquí». Debe ser menor que el umbral de «Sin señal» (15 s). */
+  keepAliveMs: number;
 }
 
 const DEFAULT_OPTIONS: PublisherOptions = {
@@ -43,6 +45,7 @@ const DEFAULT_OPTIONS: PublisherOptions = {
   holdMaxMeters: 200,
   movingSpeed: 1,
   sendEveryMs: 3_000,
+  keepAliveMs: 8_000,
 };
 
 export type MotionState = "searching" | "still" | "moving";
@@ -288,6 +291,17 @@ export class PositionPublisher {
   private radius(): number {
     const o = this.options;
     return Math.min(o.holdMaxMeters, Math.max(o.holdMinMeters, this.accuracyEma ?? 0, NOISE_FACTOR * (this.noiseEma ?? 0)));
+  }
+
+  /**
+   * Latido: un bus detenido (semáforo, estación) o un computador quieto no sale de la zona muerta y no publica nada, y el
+   * mapa lo marcaría «Sin señal». Si pasó `keepAliveMs` desde la última publicación, devuelve la última posición para
+   * repetirla. Sin posición conocida todavía (buscando GPS) no hay nada que repetir.
+   */
+  keepAlive(now: number): LatLng | null {
+    if (this.anchor === null || now - this.lastSentAt < this.options.keepAliveMs) return null;
+    this.lastSentAt = now;
+    return this.anchor;
   }
 
   private send(point: LatLng, now: number, accuracy: number, state: MotionState): PublisherUpdate {
