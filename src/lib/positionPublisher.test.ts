@@ -198,6 +198,30 @@ describe("PositionPublisher", () => {
     });
   });
 
+  describe("zona muerta en centímetros", () => {
+    /** Calienta con lecturas buenas en HOME y luego mueve el dispositivo `meters` al este; cuenta cuántas publicaciones salen. */
+    function publicacionesTras(meters: number, options?: { holdMinMeters: number; holdMaxMeters: number }) {
+      const publisher = new PositionPublisher(options);
+      publisher.reset(0);
+      for (let t = 0; t < 20; t++) publisher.push({ lat: HOME[0], lng: HOME[1], accuracy: 5, timestamp: t * 1000, speed: null }, t * 1000);
+      const moved = at(meters, 0);
+      let published = 0;
+      for (let t = 20; t < 60; t++) {
+        const update = publisher.push({ lat: moved[0], lng: moved[1], accuracy: 5, timestamp: t * 1000, speed: null }, t * 1000);
+        if (update.publish) published++;
+      }
+      return published;
+    }
+
+    it("con la zona muerta por defecto, 1 m de desplazamiento no se publica", () => {
+      expect(publicacionesTras(1)).toBe(0);
+    });
+
+    it("con la zona muerta en centímetros, 1 m de desplazamiento sí se publica", () => {
+      expect(publicacionesTras(1, { holdMinMeters: 0.05, holdMaxMeters: 0.3 })).toBeGreaterThan(0);
+    });
+  });
+
   it("reset() empieza de cero (nuevo viaje)", () => {
     const gauss = rng(11);
     const publisher = new PositionPublisher();
