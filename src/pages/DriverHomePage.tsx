@@ -18,6 +18,11 @@ import { PositionPublisher } from "@/lib/positionPublisher";
 
 /** Una lectura con este margen de error (metros) o mejor se considera "señal GPS buena" (solo para el color). */
 const GOOD_FIX_METERS = 50;
+/**
+ * Zona muerta del conductor en centímetros: el punto se actualiza con desplazamientos de ~30 cm (por defecto serían 25 a 200 m
+ * según el margen de error del GPS). Con un GPS impreciso el punto "baila" más; con un celular en movimiento sigue el trayecto.
+ */
+const PUBLISHER_OPTIONS = { holdMinMeters: 0.05, holdMaxMeters: 0.3 };
 /** Cada cuánto se revisa si toca repetir la última posición (el publicador decide con su propio plazo). */
 const KEEP_ALIVE_CHECK_MS = 2_000;
 
@@ -34,7 +39,7 @@ export function DriverHomePage() {
   const [hasFix, setHasFix] = useState(false);
   const [picking, setPicking] = useState(false);
   // Decide qué posición se publica y cuándo (espera inicial, filtro, quieto/en movimiento): ver lib/positionPublisher.ts.
-  const publisherRef = useRef(new PositionPublisher());
+  const publisherRef = useRef(new PositionPublisher(PUBLISHER_OPTIONS));
 
   const assignment = useAssignedRoute() ?? undefined;
   const activeTrip = assignment ? activeTrips.find((t) => t.busId === assignment.busId) : undefined;
